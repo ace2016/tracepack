@@ -1,0 +1,11 @@
+{
+  "name": "@tracepack/evidence-interchange",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "build": "tsc --noEmit", "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "dependencies": { "@tracepack/document-engine": "workspace:*", "@tracepack/evidence-core": "workspace:*", "@tracepack/evidence-sdk": "workspace:*", "@tracepack/storage": "workspace:*" },
+  "devDependencies": { "typescript": "^5.9.2", "vitest": "^3.2.4" }
+}

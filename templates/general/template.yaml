@@ -1,0 +1,36 @@
+id: general
+name: General record
+version: 0.1.0
+jurisdiction: general
+intake:
+  summary_label: Summary
+  summary_placeholder: Describe what this record is for and why you're building it.
+  resolution_label: Notes
+  resolution_placeholder: Any other context worth recording.
+categories:
+  - id: documents
+    name: Documents
+    requirement: recommended
+    description: Any documents relevant to this record.
+    accepted_types: [pdf, image]
+  - id: photos_and_media
+    name: Photos and media
+    requirement: recommended
+    description: Photos, screenshots or other visual evidence.
+    accepted_types: [image, webpage]
+  - id: correspondence
+    name: Correspondence
+    requirement: optional
+    description: Messages, emails or other communication relevant to this record.
+    accepted_types: [pdf, image, webpage]
+  - id: notes
+    name: Notes
+    requirement: optional
+    description: Written context, background or explanation.
+    accepted_types: [note]
+  - id: other_evidence
+    name: Other evidence
+    requirement: optional
+    description: Anything else relevant that doesn't fit the categories above.
+    accepted_types: [pdf, image, webpage, note]
+export_sections: [cover, general_summary, evidence_checklist, timeline, evidence_index, evidence_documents, source_manifest]

@@ -1,0 +1,21 @@
+{
+  "name": "@tracepack/template-engine",
+  "version": "0.1.0",
+  "description": "Loads and validates Tracepack template.yaml definitions into a TemplateSnapshot — the same schema, the same validation, whether a template ships as a file or is built at runtime by a user.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "prepublishOnly": "pnpm run build && pnpm run test"
+  },
+  "dependencies": { "@tracepack/evidence-core": "workspace:*", "yaml": "^2.8.1", "zod": "^4.1.5" },
+  "devDependencies": { "esbuild": "^0.28.1", "typescript": "^5.9.2", "vitest": "^3.2.4" },
+  "engines": { "node": ">=18" }
+}

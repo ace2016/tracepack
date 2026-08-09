@@ -1,0 +1,29 @@
+{
+  "description": "A valid payload with zero attachments (SPEC.md section 6.3) -- structured claims only, no files.",
+  "expected_valid": true,
+  "expected_reason": "attachments: [] is explicitly allowed; the payload is otherwise complete.",
+  "json_schema_alone_sufficient": true,
+  "payload": {
+    "schema_version": 1,
+    "source": {
+      "producer_id": "com.example.minimal-producer",
+      "producer_name": "Minimal Test Producer"
+    },
+    "capture_timestamp": "2026-01-01T00:00:00Z",
+    "evidence_type": "test_fixture",
+    "attachments": [],
+    "observations": [
+      {
+        "id": "o1",
+        "kind": "no_evidence_found",
+        "label": "No proof of purchase available",
+        "detail": "Checked all known sources; no proof-of-purchase document exists for this claim."
+      }
+    ],
+    "integrity": {
+      "algorithm": "sha256",
+      "canonicalization": "RFC8785",
+      "payload_hash": "916f46f76f4f07438fcca91f9c3371cf02ed3cca66f9e8062c24bf415f4a8573"
+    }
+  }
+}

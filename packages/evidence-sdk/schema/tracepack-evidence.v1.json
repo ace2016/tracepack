@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tracepack.example/schema/tracepack-evidence.v1.json",
+  "title": "Tracepack Evidence Interchange v1",
+  "description": "A portable evidence payload an external producer hands to Tracepack. See SPEC.md in this package for the full design and the meaning of every field, especially the trust boundary around `observations` and the two separate hash concepts. This is the canonical, language-agnostic contract — packages/evidence-interchange/src/types.ts and validate.ts are its TypeScript mirror, kept in sync and checked against shared fixtures in tests/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "source", "capture_timestamp", "evidence_type",
+    "attachments", "observations", "integrity"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Required from v1 onward. An importer must reject any schema_version it does not explicitly support before interpreting anything else in the payload."
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producer_id", "producer_name"],
+      "properties": {
+        "producer_id": { "type": "string", "minLength": 1, "description": "Stable machine identifier, producer-chosen. Reverse-DNS style recommended, e.g. \"com.example.review-analyzer\"." },
+        "producer_name": { "type": "string", "minLength": 1, "description": "Human-readable name shown in Tracepack's UI and exports." },
+        "producer_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "capture_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$",
+      "description": "ISO 8601, when the PRODUCER captured or generated this evidence — not when Tracepack imports it."
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Absolute http(s) URL this evidence relates to, if applicable."
+    },
+    "evidence_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Producer-defined free-text classification, e.g. \"product_listing_review\". Not a closed enum — Tracepack does not gatekeep what kinds of evidence exist."
+    },
+    "attachments": {
+      "type": "array",
+      "description": "May be empty — see SPEC.md section 6.3 for how an attachment-less payload is represented in Tracepack.",
+      "items": { "$ref": "#/$defs/attachment" }
+    },
+    "observations": {
+      "type": "array",
+      "description": "Claims made by the producer named in `source`, which is itself self-asserted and not cryptographically verified — see SPEC.md sections 4 and 5. Tracepack does not independently verify these claims either — see SPEC.md section 4 for how this trust boundary is preserved through import and export.",
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Producer-defined open extension point. Serialised size is capped at 64KB and must not contain __proto__, constructor, or prototype keys at any depth."
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "canonicalization", "payload_hash"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "canonicalization": {
+          "const": "RFC8785",
+          "description": "RFC 8785 (JSON Canonicalization Scheme), unmodified — see SPEC.md section 6.2 for the exact field-exclusion rule and worked test vectors."
+        },
+        "payload_hash": {
+          "$ref": "#/$defs/sha256Hex",
+          "description": "SHA-256 of the RFC 8785 canonical form of the payload, excluding attachments[].data and this field itself. Proves the structured claims were not altered relative to what was hashed — does NOT prove they are true, and does NOT prove who computed the hash. See SPEC.md sections 5 and 13."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "filename", "mime_type", "size", "content_hash", "encoding", "data"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "filename": { "type": "string", "minLength": 1 },
+        "mime_type": {
+          "enum": ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+          "description": "Deliberately limited to the MIME types Tracepack can already preview, embed and export today."
+        },
+        "size": { "type": "integer", "minimum": 0, "description": "Decoded byte length. The importer verifies this against the actual decoded size and rejects a mismatch." },
+        "content_hash": {
+          "$ref": "#/$defs/sha256Hex",
+          "description": "SHA-256 of the attachment's original binary file bytes, computed BEFORE base64 encoding (never of the base64 text itself). Proves the bytes Tracepack stored match what the producer sent — does not prove the attachment is authentic, or who sent it. See SPEC.md section 6.1 for the exact procedure and a worked test vector."
+        },
+        "encoding": {
+          "const": "base64",
+          "description": "The only transport v1 supports. No remote URI references and no multipart bundles — see SPEC.md section 7 for why this is a deliberate scope decision, not an oversight."
+        },
+        "data": { "type": "string", "minLength": 1 }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "label", "detail"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1, "description": "Producer-defined observation type, e.g. \"suspicious_review_clustering\". Not a closed enum." },
+        "label": { "type": "string", "minLength": 1 },
+        "detail": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "The PRODUCER's own confidence in this claim, not a Tracepack-assigned score." },
+        "attachment_ref": { "type": "string", "minLength": 1, "description": "If set, must match an attachments[].id in this same payload. If absent, this observation is about the evidence as a whole." },
+        "data": { "type": "object", "description": "Producer-defined open extension point, same 64KB / unsafe-key limits as top-level metadata." }
+      }
+    }
+  }
+}

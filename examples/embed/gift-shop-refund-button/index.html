@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Example Gift Shop — Refund request</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 560px; margin: 60px auto; padding: 0 20px; color: #17231d; }
+  button, .download-link { background: #1d3c2d; color: #fff; border: 0; border-radius: 8px; padding: 12px 20px; font: inherit; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .status { margin-top: 16px; font-size: 14px; color: #5c6a61; }
+  .secondary { margin-top: 18px; font-size: 13.5px; color: #5c6a61; }
+  .secondary a { color: #1d3c2d; font-weight: 700; }
+</style>
+</head>
+<body>
+<h1>Refund request — Order #4821</h1>
+<p>Something wrong with your order? Send the details straight to Tracepack to start building your case.</p>
+<button id="send">Send to Tracepack</button>
+<p class="status" id="status"></p>
+<p class="secondary">Prefer not to open a new tab? <a id="download" href="#">Download the evidence file instead</a> and add it in Tracepack later.</p>
+
+<script type="module">
+// A worked, framework-free example of the "Send to Tracepack" embed contract: no build step, no
+// dependency on Tracepack's own code, just window.open() + postMessage. See
+// packages/evidence-interchange/EMBED_GUIDE.md for the full protocol this implements.
+//
+// This always opens Tracepack's hosted workspace app -- no browser extension involved, and no
+// "is it installed" detection needed. The postMessage handoff doesn't care whether the tab it's
+// talking to came from an extension or a plain https:// page; a real URL always "works" as far
+// as window.open() is concerned, so there's nothing to check for up front. (An earlier version
+// of this example opened a chrome-extension:// URL and pinged the extension first to detect
+// whether it was installed before trying -- that whole detection dance only existed because the
+// destination used to require an extension. It doesn't, so it's gone.)
+//
+// Payload construction here is inlined (sha256Hex + a small canonicalizer) rather than
+// importing @tracepack/evidence-sdk, purely because this is a single static HTML file with no
+// build step and the package isn't meant to be loaded from a CDN. In a real product, do this
+// server-side with @tracepack/evidence-sdk instead (see its README) -- hashing and
+// canonicalizing in the browser is fine for a demo, but a real refund/deposit form should build
+// and sign off on the payload from a trusted backend, not from code running in the customer's
+// own browser that they could tamper with before it's ever reviewed.
+
+const TRACEPACK_URL = "https://app.tracepack.org/?send-to-tracepack=1";
+
+async function sha256Hex(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// A minimal RFC 8785-compatible canonicalizer for this flat, ASCII-only example payload. Use a
+// real RFC 8785 library (e.g. the `canonicalize` npm package @tracepack/evidence-sdk wraps) for
+// anything with nested objects, non-ASCII text, or numbers -- this shortcut only holds for
+// exactly the shape built below.
+function canonicalize(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+async function buildRefundPayload() {
+  // No file attachment in this demo -- the schema's four supported attachment MIME types
+  // (application/pdf, image/jpeg, image/png, image/webp) don't include a plain text note, so a
+  // gift shop with only a typed reason (no receipt scan or photo to attach) sends it as an
+  // observation instead. Tracepack synthesizes a note from it automatically -- see
+  // packages/evidence-interchange/SPEC.md section 6.3. A real return with a receipt photo would
+  // add it under `attachments` the same way the SDK's own README example does.
+  const draft = {
+    schema_version: 1,
+    source: { producer_id: "com.example.giftshop", producer_name: "Example Gift Shop", producer_version: "1.0.0" },
+    capture_timestamp: new Date().toISOString(),
+    source_url: window.location.href,
+    evidence_type: "product_return_dispute",
+    attachments: [],
+    observations: [{
+      id: "obs-1", kind: "return_reason", label: "Customer-reported return reason",
+      detail: "Order #4821: mug arrived cracked in transit. Customer requests full refund.", confidence: 0.95,
+    }],
+    integrity: { algorithm: "sha256", canonicalization: "RFC8785", payload_hash: "0".repeat(64) },
+  };
+
+  const attachmentsWithoutBytes = draft.attachments.map(({ data, ...rest }) => rest);
+  const hashable = { ...draft, attachments: attachmentsWithoutBytes, integrity: { algorithm: draft.integrity.algorithm, canonicalization: draft.integrity.canonicalization } };
+  draft.integrity.payload_hash = await sha256Hex(new TextEncoder().encode(canonicalize(hashable)));
+  return draft;
+}
+
+const statusEl = document.getElementById("status");
+const button = document.getElementById("send");
+const downloadLink = document.getElementById("download");
+
+button.addEventListener("click", async () => {
+  button.disabled = true;
+  statusEl.textContent = "Opening Tracepack...";
+
+  const tracepackTab = window.open(TRACEPACK_URL, "_blank");
+  if (!tracepackTab) {
+    statusEl.textContent = "Your browser blocked the popup. Please allow popups for this site and try again, or use the download link below instead.";
+    button.disabled = false;
+    return;
+  }
+
+  const payload = await buildRefundPayload();
+
+  // window.open() only tells us the popup wasn't blocked, not that the page behind it ever
+  // actually loads. An offline session, a DNS failure, or an outage on Tracepack's side all
+  // leave this tab open with no "ready" message ever coming, so without a timeout the button
+  // stays disabled and the status text stuck on "Opening Tracepack..." forever.
+  const handshakeTimeout = setTimeout(() => {
+    window.removeEventListener("message", onMessage);
+    statusEl.textContent = "Tracepack didn't respond. Use the download link below instead.";
+    button.disabled = false;
+  }, 15000);
+
+  function onMessage(event) {
+    if (!event.data || event.data.source !== "tracepack") return;
+    if (event.data.type === "ready") {
+      clearTimeout(handshakeTimeout);
+      tracepackTab.postMessage({ source: "tracepack-producer", type: "evidence", payload }, "*");
+      statusEl.textContent = "Sent. Review it in the Tracepack tab.";
+    }
+    if (event.data.type === "imported") {
+      statusEl.textContent = `Added to the customer's Tracepack pack (${event.data.evidenceCount} item${event.data.evidenceCount === 1 ? "" : "s"}).`;
+      window.removeEventListener("message", onMessage);
+      button.disabled = false;
+    }
+  }
+  window.addEventListener("message", onMessage);
+});
+
+// Always available, not just an error fallback: some customers will genuinely prefer a file
+// they can add later over a new tab opening automatically. Tracepack's own "add evidence"
+// screen (the manual-import option next to the paste box) accepts this file directly.
+downloadLink.addEventListener("click", async (event) => {
+  event.preventDefault();
+  const payload = await buildRefundPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "tracepack-evidence-order-4821.json";
+  link.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>

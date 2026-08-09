@@ -1,0 +1,8 @@
+{
+  "description": "Verifies the attachments[].content_hash procedure in SPEC.md section 6.1: SHA-256 of the ORIGINAL BINARY BYTES, computed before base64 encoding, never of the base64 text itself.",
+  "original_content_utf8": "Tracepack interchange test attachment.",
+  "content_base64": "VHJhY2VwYWNrIGludGVyY2hhbmdlIHRlc3QgYXR0YWNobWVudC4=",
+  "byte_length": 38,
+  "content_hash_sha256_hex": "a07b37177fb90cbf3a9c37f003425ad458e71f209c87b2c8f0b3512dc90c2694",
+  "how_to_check": "Base64-decode content_base64 into bytes, take the SHA-256 of those bytes, format as lowercase hex, and confirm it equals content_hash_sha256_hex. If you instead hash the base64 text itself, you will get a different value -- that mismatch is the most common first-implementation bug (see SPEC.md section 6.1)."
+}

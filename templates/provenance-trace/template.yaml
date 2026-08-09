@@ -1,0 +1,59 @@
+id: provenance-trace
+name: Provenance Trace
+version: 0.1.0
+jurisdiction: general
+intake:
+  summary_label: Asset overview
+  summary_placeholder: Describe the asset (make, model, year) and why you're building this record, for example an upcoming sale, appraisal or insurance claim.
+  resolution_label: Notes
+  resolution_placeholder: Any other context worth recording.
+privacy_rules:
+  - kind: vin
+    label: Vehicle Identification Number (VIN)
+    pattern: '\b[A-HJ-NPR-Z0-9]{17}\b'
+    flags: gi
+chronology_rules:
+  # A vehicle or high-value asset with no documented activity for two years is a real gap
+  # worth surfacing to a buyer or appraiser, not just a sorted list of dates.
+  max_gap_days: 730
+guidance:
+  - category_id: ownership_documents
+    text: Tracepack flags the VIN automatically wherever it appears. Keep it visible if a buyer needs to verify it against the title; mark it for removal before sharing publicly.
+categories:
+  - id: ownership_documents
+    name: Ownership documents
+    requirement: required
+    description: Title, deed, registration or purchase contract proving ownership.
+    accepted_types: [pdf, image]
+  - id: purchase_evidence
+    name: Purchase evidence
+    requirement: required
+    description: The original purchase receipt, invoice or auction record.
+    accepted_types: [pdf, image, webpage]
+  - id: service_and_maintenance
+    name: Service and maintenance records
+    requirement: recommended
+    description: Service history, maintenance logs and inspection reports.
+    accepted_types: [pdf, image, note]
+  - id: restoration_and_repair
+    name: Restoration and repair
+    requirement: recommended
+    description: Before and after photos, restoration invoices and parts receipts.
+    accepted_types: [pdf, image, note]
+  - id: certification
+    name: Certification and authentication
+    requirement: recommended
+    description: Certificates of authenticity, appraisals or expert verification.
+    accepted_types: [pdf, image]
+  - id: condition_evidence
+    name: Current condition
+    requirement: optional
+    description: Recent photos of condition, including any known defects. At least two angles.
+    accepted_types: [pdf, image, note]
+    min_items: 2
+  - id: supporting_evidence
+    name: Supporting evidence
+    requirement: optional
+    description: Registry entries, press coverage or other supporting material.
+    accepted_types: [pdf, image, webpage, note]
+export_sections: [cover, provenance_summary, evidence_checklist, timeline, evidence_index, evidence_documents, source_manifest]

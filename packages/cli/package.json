@@ -1,0 +1,23 @@
+{
+  "name": "@tracepack/cli",
+  "version": "0.1.0",
+  "description": "Command-line validation for Tracepack template.yaml files and tracepack-evidence v1 payloads — runs outside the browser, for a template contributor's or an evidence producer's own CI.",
+  "license": "Apache-2.0",
+  "bin": { "tracepack": "./dist/cli.js" },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build && pnpm run test"
+  },
+  "devDependencies": {
+    "@tracepack/evidence-core": "workspace:*",
+    "@tracepack/evidence-sdk": "workspace:*",
+    "@tracepack/template-engine": "workspace:*",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": { "node": ">=18" }
+}

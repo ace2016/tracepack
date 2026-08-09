@@ -1,0 +1,49 @@
+{
+  "description": "Every observations[].id must be unique within a payload.",
+  "expected_valid": false,
+  "expected_reason": "Two observations both use the id \"o1\". Same JSON-Schema limitation as the duplicate-attachment-id vector.",
+  "json_schema_alone_sufficient": false,
+  "payload": {
+    "schema_version": 1,
+    "source": {
+      "producer_id": "com.example.minimal-producer",
+      "producer_name": "Minimal Test Producer"
+    },
+    "capture_timestamp": "2026-01-01T00:00:00Z",
+    "evidence_type": "test_fixture",
+    "attachments": [
+      {
+        "id": "a1",
+        "filename": "test.txt",
+        "mime_type": "application/pdf",
+        "size": 38,
+        "content_hash": "a07b37177fb90cbf3a9c37f003425ad458e71f209c87b2c8f0b3512dc90c2694",
+        "encoding": "base64",
+        "data": "VHJhY2VwYWNrIGludGVyY2hhbmdlIHRlc3QgYXR0YWNobWVudC4="
+      }
+    ],
+    "observations": [
+      {
+        "id": "o1",
+        "kind": "example_observation",
+        "label": "Example",
+        "detail": "An example observation for a validation vector.",
+        "confidence": 0.5,
+        "attachment_ref": "a1"
+      },
+      {
+        "id": "o1",
+        "kind": "example_observation",
+        "label": "Example",
+        "detail": "An example observation for a validation vector.",
+        "confidence": 0.5,
+        "attachment_ref": "a1"
+      }
+    ],
+    "integrity": {
+      "algorithm": "sha256",
+      "canonicalization": "RFC8785",
+      "payload_hash": "916f46f76f4f07438fcca91f9c3371cf02ed3cca66f9e8062c24bf415f4a8573"
+    }
+  }
+}

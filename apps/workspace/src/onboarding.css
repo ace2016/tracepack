@@ -1,0 +1,53 @@
+/* apps/workspace's own onboarding -- intentionally not apps/website/src/onboarding.css.
+   Same colour tokens as the rest of this app's styles.css (it's the same product), but a much
+   smaller, quieter treatment: no full-scene illustrations, no page-turn animation between
+   steps. This is a short orientation for someone already inside the tool, not a pitch. */
+
+.ws-ob-scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(23, 35, 29, 0.5);
+  display: flex; align-items: safe center; justify-content: center;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.ws-ob-card {
+  position: relative;
+  width: min(420px, 100%);
+  background: var(--paper);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lift);
+  padding: 40px 32px 28px;
+  text-align: left;
+}
+
+.ws-ob-skip {
+  position: absolute; top: 16px; right: 16px;
+  border: 0; background: transparent; color: var(--muted);
+  font-size: 12.5px; font-weight: 700; padding: 6px 8px; cursor: pointer;
+}
+.ws-ob-skip:hover { color: var(--ink); }
+
+.ws-ob-icon {
+  width: 40px; height: 40px;
+  fill: none; stroke: var(--accent-ink); stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round;
+  margin-bottom: 18px;
+}
+.ws-ob-icon .ws-ob-flag { fill: var(--accent); stroke: var(--accent-ink); }
+
+.ws-ob-eyebrow { text-transform: uppercase; letter-spacing: 0.13em; font-size: 11.5px; font-weight: 800; color: var(--muted); margin: 0 0 8px; }
+.ws-ob-head { font-size: 22px; line-height: 1.25; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 10px; text-wrap: balance; }
+.ws-ob-body { font-size: 14.5px; line-height: 1.6; color: var(--muted); margin: 0; min-height: 82px; }
+
+.ws-ob-controls { display: flex; align-items: center; justify-content: space-between; margin-top: 26px; }
+.ws-ob-dots { display: flex; gap: 6px; }
+.ws-ob-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--line-strong); }
+.ws-ob-dots span.is-current { background: var(--accent-ink); width: 16px; border-radius: 3px; }
+.ws-ob-dots span.is-done { background: var(--muted); }
+.ws-ob-btns { display: flex; align-items: center; gap: 6px; }
+.ws-ob-btns .btn-primary { padding: 10px 18px; font-size: 14px; }
+
+@media (max-width: 480px) {
+  .ws-ob-card { padding: 36px 22px 22px; }
+}

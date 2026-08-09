@@ -1,0 +1,27 @@
+{
+  "name": "consumer-rights-helper-example-producer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A clean-room tracepack-evidence v1 producer, built only from the public SPEC and JSON Schema — proves the interchange contract is genuinely implementable by a developer who has never seen Tracepack's source.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "json-canonicalize": "^2.0.0",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@tracepack/document-engine": "workspace:*",
+    "@tracepack/evidence-core": "workspace:*",
+    "@tracepack/evidence-interchange": "workspace:*",
+    "@tracepack/export-engine": "workspace:*",
+    "@tracepack/storage": "workspace:*",
+    "@types/node": "^24.0.0",
+    "fake-indexeddb": "^6.2.5",
+    "pdfjs-dist": "5.4.624",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

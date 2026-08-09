@@ -1,0 +1,20 @@
+{
+  "name": "@tracepack/evidence-core",
+  "version": "0.1.0",
+  "description": "Tracepack's core domain model — EvidenceItem, TracepackProject, TemplateSnapshot — and the pure functions that operate on them (progress, category state, chronology gaps). No framework or runtime dependency.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "README.md"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "pnpm run build && pnpm run test"
+  },
+  "devDependencies": { "esbuild": "^0.28.1", "typescript": "^5.9.2", "vitest": "^3.2.4" },
+  "engines": { "node": ">=18" }
+}

@@ -1,0 +1,39 @@
+{
+  "description": "metadata must not contain __proto__, constructor, or prototype keys at any depth.",
+  "expected_valid": false,
+  "expected_reason": "metadata.safe.__proto__ is a prototype-pollution vector, not ordinary data, once parsed from JSON text. metadata is intentionally an open, unconstrained object in the schema (that openness is the whole point of the extension field), so forbidding specific key names at arbitrary depth is not expressible there -- it is enforced only by the reference validator's semantic pass.",
+  "json_schema_alone_sufficient": false,
+  "payload": {
+    "schema_version": 1,
+    "source": {
+      "producer_id": "com.example.minimal-producer",
+      "producer_name": "Minimal Test Producer"
+    },
+    "capture_timestamp": "2026-01-01T00:00:00Z",
+    "evidence_type": "test_fixture",
+    "attachments": [
+      {
+        "id": "a1",
+        "filename": "test.txt",
+        "mime_type": "application/pdf",
+        "size": 38,
+        "content_hash": "a07b37177fb90cbf3a9c37f003425ad458e71f209c87b2c8f0b3512dc90c2694",
+        "encoding": "base64",
+        "data": "VHJhY2VwYWNrIGludGVyY2hhbmdlIHRlc3QgYXR0YWNobWVudC4="
+      }
+    ],
+    "observations": [],
+    "integrity": {
+      "algorithm": "sha256",
+      "canonicalization": "RFC8785",
+      "payload_hash": "916f46f76f4f07438fcca91f9c3371cf02ed3cca66f9e8062c24bf415f4a8573"
+    },
+    "metadata": {
+      "safe": {
+        "__proto__": {
+          "polluted": true
+        }
+      }
+    }
+  }
+}

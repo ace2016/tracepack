@@ -1,0 +1,32 @@
+{
+  "description": "capture_timestamp must be a real ISO 8601 calendar date/time, not just a string matching the pattern.",
+  "expected_valid": false,
+  "expected_reason": "February 30th does not exist; a naive Date.parse silently rolls this over to March 2nd instead of rejecting it, so a conforming validator must check the calendar explicitly. The schema's own \"pattern\" regex only checks digit shape, and this package deliberately leaves ajv's \"date-time\" format keyword unvalidated (see tests/json-schema.test.ts) since format keywords are advisory, not structural, in JSON Schema.",
+  "json_schema_alone_sufficient": false,
+  "payload": {
+    "schema_version": 1,
+    "source": {
+      "producer_id": "com.example.minimal-producer",
+      "producer_name": "Minimal Test Producer"
+    },
+    "capture_timestamp": "2026-02-30T00:00:00Z",
+    "evidence_type": "test_fixture",
+    "attachments": [
+      {
+        "id": "a1",
+        "filename": "test.txt",
+        "mime_type": "application/pdf",
+        "size": 38,
+        "content_hash": "a07b37177fb90cbf3a9c37f003425ad458e71f209c87b2c8f0b3512dc90c2694",
+        "encoding": "base64",
+        "data": "VHJhY2VwYWNrIGludGVyY2hhbmdlIHRlc3QgYXR0YWNobWVudC4="
+      }
+    ],
+    "observations": [],
+    "integrity": {
+      "algorithm": "sha256",
+      "canonicalization": "RFC8785",
+      "payload_hash": "916f46f76f4f07438fcca91f9c3371cf02ed3cca66f9e8062c24bf415f4a8573"
+    }
+  }
+}

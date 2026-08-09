@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome to Tracepack</title>
+<style>
+  :root {
+    --ink: #17231d; --muted: #627068; --paper: #fffef9; --bg: #f4f3ed; --line: #d9ddd6;
+    --accent: #d5f66b; --accent-dark: #1d3c2d; --soft: #eceee7;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: light; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 0 20px 60px; }
+
+  .top { width: 100%; padding: 22px 4px 0; display: flex; justify-content: center; }
+  .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+  .brand-mark { width: 21px; height: 21px; flex-shrink: 0; }
+  .brand-mark .page { fill: #1d3c2d; } .brand-mark .hole { fill: #fffef9; }
+
+  .stage { width: min(620px, 100%); margin-top: 34px; }
+
+  /* ---------- Browser chrome sliver + hand-drawn arrow, showing where the icon lives ---------- */
+  .locator { position: relative; margin: 0 auto 46px; width: min(420px, 100%); }
+  .toolbar-mock {
+    display: flex; align-items: center; gap: 8px; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px 10px; box-shadow: 0 10px 24px -18px rgba(23,35,29,0.4);
+    opacity: 0; transform: translateY(-8px);
+  }
+  .toolbar-mock .url { flex: 1; background: var(--soft); border-radius: 999px; padding: 6px 12px; font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toolbar-mock .icons { display: flex; gap: 5px; }
+  .toolbar-mock .icon-slot { width: 25px; height: 25px; border-radius: 7px; display: grid; place-items: center; }
+  .toolbar-mock .icon-slot svg { width: 14px; height: 14px; }
+  .toolbar-mock .icon-slot.tracepack { background: #dff0b8; position: relative; }
+  .pulse-ring {
+    position: absolute; inset: -5px; border-radius: 11px; border: 2px solid #78a92f; opacity: 0;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .pulse-ring { animation: pulseRing 2.2s ease-out 1.4s infinite; }
+  }
+  @keyframes pulseRing { 0% { opacity: 0.65; transform: scale(0.9); } 70% { opacity: 0; transform: scale(1.35); } 100% { opacity: 0; transform: scale(1.35); } }
+
+  .hand-arrow { position: absolute; top: 100%; right: 6%; width: 130px; height: 110px; overflow: visible; }
+  .hand-arrow .stroke-path { fill: none; stroke: #9d352b; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .hand-arrow .head { fill: #9d352b; stroke: none; opacity: 0; transform: scale(0.3); transform-origin: 104px 13px; }
+  .arrow-loop { transform-origin: 14px 96px; }
+  .locator-note {
+    position: absolute; top: calc(100% + 78px); right: -4%; width: 150px; font-size: 13px; font-style: italic;
+    color: #7a3a30; line-height: 1.35; transform: rotate(-3deg); opacity: 0;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .toolbar-mock { animation: dropIn 0.55s cubic-bezier(.2,.7,.2,1) 0.15s forwards; }
+    /* The line "draws" itself in stroke-first (a long dash pulled back to its full
+       length), the classic hand-sketch reveal, rather than just fading the whole
+       arrow in at once. 200 comfortably exceeds this path's actual length, so only
+       one dash segment ever shows and dashoffset:0 reveals it completely. */
+    .hand-arrow .stroke-path { stroke-dasharray: 200; stroke-dashoffset: 200; animation: drawArrow 0.7s cubic-bezier(.4,0,.2,1) 0.6s forwards; }
+    .hand-arrow .head { animation: headPop 0.3s cubic-bezier(.3,1.6,.5,1) 1.25s forwards; }
+    .arrow-loop { animation: arrowNudge 2.2s ease-in-out 1.7s infinite; }
+    .locator-note { animation: noteIn 0.5s ease 1.35s forwards; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toolbar-mock, .hand-arrow .head, .locator-note { opacity: 1; transform: none; }
+    .hand-arrow .stroke-path { stroke-dashoffset: 0; }
+  }
+  @keyframes dropIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes drawArrow { to { stroke-dashoffset: 0; } }
+  @keyframes headPop { to { opacity: 1; transform: scale(1); } }
+  @keyframes arrowNudge { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -3px); } }
+  @keyframes noteIn { to { opacity: 1; } }
+
+  /* ---------- Main content ---------- */
+  .main { text-align: center; opacity: 0; transform: translateY(10px); }
+  @media (prefers-reduced-motion: no-preference) { .main { animation: mainIn 0.6s cubic-bezier(.2,.7,.2,1) 0.1s forwards; } }
+  @media (prefers-reduced-motion: reduce) { .main { opacity: 1; transform: none; } }
+  @keyframes mainIn { to { opacity: 1; transform: translateY(0); } }
+
+  .pin-illustration { width: 92px; height: 92px; margin: 0 auto 22px; }
+  .pin-illustration .shadow { fill: rgba(23,35,29,0.08); }
+  .pin-illustration .pin-body { fill: #1d3c2d; }
+  .pin-illustration .pin-head { fill: #d5f66b; stroke: #1d3c2d; stroke-width: 2.2; }
+  .pin-illustration .sparkle { fill: #78a92f; }
+  @media (prefers-reduced-motion: no-preference) {
+    .pin-illustration .pin-group { animation: pinDrop 0.7s cubic-bezier(.3,1.6,.5,1) 0.3s both; transform-origin: 50% 8%; }
+    .pin-illustration .sparkle { animation: sparkleIn 0.5s ease 0.9s both; transform-origin: center; }
+  }
+  @keyframes pinDrop { 0% { transform: translateY(-30px) rotate(-14deg); opacity: 0; } 60% { transform: translateY(3px) rotate(4deg); opacity: 1; } 100% { transform: translateY(0) rotate(0); } }
+  @keyframes sparkleIn { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.25); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+
+  .eyebrow { text-transform: uppercase; letter-spacing: 0.13em; font-size: 12px; font-weight: 800; color: #4f6c5d; margin: 0 0 10px; }
+  h1 { font-size: clamp(28px, 4vw, 36px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 12px; }
+  .lead { color: var(--muted); font-size: 15.5px; line-height: 1.55; max-width: 40ch; margin: 0 auto 40px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; text-align: left; margin-bottom: 30px; }
+  @media (max-width: 620px) { .steps { grid-template-columns: 1fr; } }
+  .step {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 18px 16px;
+    opacity: 0; transform: translateY(12px);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .step:nth-child(1) { animation: stepIn 0.5s cubic-bezier(.2,.7,.2,1) 1.05s forwards; }
+    .step:nth-child(2) { animation: stepIn 0.5s cubic-bezier(.2,.7,.2,1) 1.18s forwards; }
+    .step:nth-child(3) { animation: stepIn 0.5s cubic-bezier(.2,.7,.2,1) 1.31s forwards; }
+  }
+  @media (prefers-reduced-motion: reduce) { .step { opacity: 1; transform: none; } }
+  @keyframes stepIn { to { opacity: 1; transform: translateY(0); } }
+  .step-icon { width: 30px; height: 30px; margin-bottom: 14px; }
+  .step-num { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; color: #9aa69d; text-transform: uppercase; margin-bottom: 8px; }
+  .step p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink); }
+
+  .foot { font-size: 13px; color: #8b968f; }
+  .foot-actions { margin-top: 18px; }
+  .quiet-link { color: #3d5c4c; font-weight: 700; font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <span class="brand">
+    <svg class="brand-mark" viewBox="0 0 96 96" aria-hidden="true">
+      <rect class="page" x="24" y="18" width="52" height="64" rx="10" transform="rotate(-6 50 50)"></rect>
+      <rect class="page" x="24" y="18" width="52" height="64" rx="10" transform="rotate(6 50 50)"></rect>
+      <circle class="hole" cx="50" cy="44" r="9"></circle>
+      <rect class="hole" x="46" y="50" width="8" height="18" rx="3"></rect>
+    </svg>
+    Tracepack
+  </span>
+</div>
+
+<div class="stage">
+  <div class="locator">
+    <div class="toolbar-mock">
+      <span class="url">kitchenexample.com</span>
+      <span class="icons">
+        <span class="icon-slot">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#7c887f" stroke-width="1.8"><path d="M13 3 h4 a2 2 0 0 1 2 2 v3 a2 2 0 0 0 2 2 a2 2 0 0 1 0 4 a2 2 0 0 0 -2 2 v3 a2 2 0 0 1 -2 2 h-3 a2 2 0 0 0 -2 -2 a2 2 0 0 0 -2 2 h-3 a2 2 0 0 1 -2 -2 v-3 a2 2 0 0 0 -2 -2 a2 2 0 0 1 0 -4 a2 2 0 0 0 2 -2 v-3 a2 2 0 0 1 2 -2 h3"></path></svg>
+        </span>
+        <span class="icon-slot tracepack">
+          <span class="pulse-ring" aria-hidden="true"></span>
+          <svg viewBox="0 0 96 96" aria-hidden="true">
+            <rect class="page" x="24" y="18" width="52" height="64" rx="10" transform="rotate(-6 50 50)" fill="#1d3c2d"></rect>
+            <rect class="page" x="24" y="18" width="52" height="64" rx="10" transform="rotate(6 50 50)" fill="#1d3c2d"></rect>
+            <circle cx="50" cy="44" r="9" fill="#dff0b8"></circle>
+            <rect x="46" y="50" width="8" height="18" rx="3" fill="#dff0b8"></rect>
+          </svg>
+        </span>
+      </span>
+    </div>
+    <svg class="hand-arrow" viewBox="0 0 130 110" aria-hidden="true">
+      <g class="arrow-loop">
+        <path class="stroke-path" d="M14 96 C 20 60, 45 30, 78 16 C 90 11, 98 10, 108 12"></path>
+        <path class="head" d="M96 4 L 112 10 L 100 22 Z"></path>
+      </g>
+    </svg>
+    <p class="locator-note">Tracepack hides up here until you pin it</p>
+  </div>
+
+  <div class="main">
+    <svg class="pin-illustration" viewBox="0 0 96 96" aria-hidden="true">
+      <ellipse class="shadow" cx="48" cy="86" rx="20" ry="5"></ellipse>
+      <g class="pin-group">
+        <path class="pin-body" d="M46 50 h4 l3 30 h-10 z"></path>
+        <path class="pin-head" d="M31 20 a17 17 0 0 1 34 0 c0 12 -9 15 -9 26 h-16 c0 -11 -9 -14 -9 -26 z"></path>
+        <circle cx="48" cy="21" r="6.5" fill="#1d3c2d"></circle>
+      </g>
+      <g class="sparkle"><path d="M78 22 l2.4 5.6 5.6 2.4 -5.6 2.4 -2.4 5.6 -2.4 -5.6 -5.6 -2.4 5.6 -2.4 z"></path></g>
+    </svg>
+
+    <p class="eyebrow">You're all set</p>
+    <h1>Pin Tracepack to your toolbar</h1>
+    <p class="lead">Keep one-click capture within reach. It takes about five seconds, and you only have to do it once.</p>
+
+    <div class="steps">
+      <div class="step">
+        <svg class="step-icon" viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="#1d3c2d" stroke-width="2"><path d="M18 5 h6 a2 2 0 0 1 2 2 v4 a2 2 0 0 0 2 2 a2 2 0 0 1 0 5 a2 2 0 0 0 -2 2 v4 a2 2 0 0 1 -2 2 h-4 a2 2 0 0 0 -2 -2 a2 2 0 0 0 -2 2 h-4 a2 2 0 0 1 -2 -2 v-4 a2 2 0 0 0 -2 -2 a2 2 0 0 1 0 -5 a2 2 0 0 0 2 -2 v-4 a2 2 0 0 1 2 -2 h4"></path></svg>
+        <span class="step-num">Step 1</span>
+        <p>Click the puzzle piece icon next to your address bar.</p>
+      </div>
+      <div class="step">
+        <svg class="step-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M13 3 h6 v9 l5 5 v3 h-8 v9 l-2 3 -2 -3 v-9 h-8 v-3 l5 -5 z" fill="none" stroke="#1d3c2d" stroke-width="2" stroke-linejoin="round"></path></svg>
+        <span class="step-num">Step 2</span>
+        <p>Find Tracepack in the list and click the pin next to it.</p>
+      </div>
+      <div class="step">
+        <svg class="step-icon" viewBox="16 10 68 80" aria-hidden="true"><rect x="24" y="18" width="52" height="64" rx="10" transform="rotate(-6 50 50)" fill="none" stroke="#1d3c2d" stroke-width="4.5"></rect><rect x="24" y="18" width="52" height="64" rx="10" transform="rotate(6 50 50)" fill="#fffef9" stroke="#1d3c2d" stroke-width="4.5"></rect><circle cx="50" cy="44" r="9" fill="#1d3c2d"></circle><rect x="46" y="50" width="8" height="18" rx="3" fill="#1d3c2d"></rect></svg>
+        <span class="step-num">Step 3</span>
+        <p>Click the icon whenever you're on a page worth keeping.</p>
+      </div>
+    </div>
+
+    <p class="foot">You can close this tab once Tracepack is pinned.</p>
+    <div class="foot-actions">
+      <a class="quiet-link" href="workspace/index.html">Open Tracepack without pinning</a>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

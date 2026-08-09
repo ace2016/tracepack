@@ -1,0 +1,13 @@
+{
+  "name": "tracepack",
+  "private": true,
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "dev": "pnpm run build:sdk && pnpm --filter @tracepack/workspace dev",
+    "build": "pnpm -r build",
+    "build:sdk": "pnpm --filter @tracepack/evidence-core --filter @tracepack/template-engine --filter @tracepack/evidence-sdk build",
+    "postinstall": "pnpm run build:sdk",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

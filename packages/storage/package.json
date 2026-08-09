@@ -1,0 +1,11 @@
+{
+  "name": "@tracepack/storage",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": { "build": "tsc --noEmit", "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "dependencies": { "@tracepack/evidence-core": "workspace:*", "idb": "^8.0.3" },
+  "devDependencies": { "fake-indexeddb": "^6.2.5", "typescript": "^5.9.2", "vitest": "^3.2.4" }
+}

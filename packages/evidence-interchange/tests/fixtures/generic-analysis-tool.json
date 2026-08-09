@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "source": {
+    "producer_id": "com.example.review-pattern-analyzer",
+    "producer_name": "Example Review Pattern Analyzer",
+    "producer_version": "2.3.0"
+  },
+  "capture_timestamp": "2026-08-04T09:15:00Z",
+  "source_url": "https://kitchenexample.com/product/kt-4400",
+  "evidence_type": "product_listing_review_analysis",
+  "attachments": [
+    {
+      "id": "att-1",
+      "filename": "product-page-screenshot.png",
+      "mime_type": "image/png",
+      "size": 68,
+      "content_hash": "431ced6916a2a21a156e38701afe55bbd7f88969fbbfc56d7fe099d47f265460",
+      "encoding": "base64",
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    }
+  ],
+  "observations": [
+    {
+      "id": "obs-1",
+      "kind": "suspicious_review_clustering",
+      "label": "Suspicious review timing pattern",
+      "detail": "37% of 5-star reviews for this listing were posted within a single 48-hour window, 11 days after the product's first review. This pattern is consistent with, but not proof of, coordinated or incentivised reviewing.",
+      "confidence": 0.82,
+      "attachment_ref": "att-1",
+      "data": {
+        "window_hours": 48,
+        "five_star_reviews_in_window": 37,
+        "total_five_star_reviews": 100
+      }
+    },
+    {
+      "id": "obs-2",
+      "kind": "verified_purchase_ratio",
+      "label": "Low verified-purchase ratio",
+      "detail": "Only 41% of reviews for this listing are marked as verified purchases, compared to a 78% category average.",
+      "confidence": 0.95
+    }
+  ],
+  "metadata": {
+    "category_average_verified_ratio": 0.78,
+    "analysis_engine_build": "rpa-2026.08.01"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "canonicalization": "RFC8785",
+    "payload_hash": "f6bb1f74d863e44f636d783a08ff4100417332dd3a003158cadb18288b369b84"
+  }
+}

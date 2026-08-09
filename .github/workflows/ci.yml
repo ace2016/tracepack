@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build publishable SDK packages
+        # evidence-core, template-engine, and evidence-sdk resolve for every other package
+        # (including apps/workspace's own build below) through their compiled dist/, not raw
+        # source. `postinstall` attempts this too, but `pnpm install --frozen-lockfile`'s
+        # "Already up to date" fast path skips lifecycle scripts entirely -- verified this is
+        # exactly what happens on this repo's dependency set, so this step is required, not a
+        # backstop for a rare edge case.
+        run: pnpm run build:sdk
+
+      - name: Typecheck all packages
+        run: pnpm -r typecheck
+
+      - name: Test all packages
+        run: pnpm -r test
+
+      - name: Build workspace app
+        run: pnpm --filter @tracepack/workspace build
+
+      - name: Build extension
+        run: pnpm --filter @tracepack/extension build
+
+      - name: Build CLI package
+        run: pnpm --filter @tracepack/cli build
+
+      - name: Install Chromium for extension smoke test
+        run: pnpm --filter @tracepack/extension exec playwright install --with-deps chromium
+
+      - name: Extension smoke test
+        run: pnpm --filter @tracepack/extension e2e

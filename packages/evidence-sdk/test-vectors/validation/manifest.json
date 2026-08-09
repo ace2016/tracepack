@@ -1,0 +1,88 @@
+{
+  "vectors": [
+    {
+      "file": "001-valid-minimal.json",
+      "expected_valid": true,
+      "json_schema_alone_sufficient": true,
+      "description": "A complete, minimal, self-consistent valid payload -- the same payload as payload-hash/001-minimal-payload.json."
+    },
+    {
+      "file": "002-valid-attachment-less.json",
+      "expected_valid": true,
+      "json_schema_alone_sufficient": true,
+      "description": "A valid payload with zero attachments (SPEC.md section 6.3) -- structured claims only, no files."
+    },
+    {
+      "file": "003-invalid-missing-schema-version.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "schema_version is required and must be checked before anything else in the payload."
+    },
+    {
+      "file": "004-invalid-unsupported-schema-version.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "A schema_version this producer's consumer does not support."
+    },
+    {
+      "file": "005-invalid-malformed-content-hash.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "attachments[].content_hash must be a 64-character lowercase SHA-256 hex digest."
+    },
+    {
+      "file": "006-invalid-unsupported-mime-type.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "attachments[].mime_type is limited to types the consumer can actually preview/embed/export."
+    },
+    {
+      "file": "007-invalid-duplicate-attachment-id.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": false,
+      "description": "Every attachments[].id must be unique within a payload."
+    },
+    {
+      "file": "008-invalid-duplicate-observation-id.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": false,
+      "description": "Every observations[].id must be unique within a payload."
+    },
+    {
+      "file": "009-invalid-dangling-attachment-ref.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": false,
+      "description": "observations[].attachment_ref, if present, must match an attachments[].id in the same payload."
+    },
+    {
+      "file": "010-invalid-capture-timestamp.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": false,
+      "description": "capture_timestamp must be a real ISO 8601 calendar date/time, not just a string matching the pattern."
+    },
+    {
+      "file": "011-invalid-source-url-scheme.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "source_url, if present, must be an absolute http(s) URL."
+    },
+    {
+      "file": "012-invalid-metadata-proto-pollution.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": false,
+      "description": "metadata must not contain __proto__, constructor, or prototype keys at any depth."
+    },
+    {
+      "file": "013-invalid-unknown-top-level-field.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "The envelope is a closed shape -- no additional top-level properties are accepted."
+    },
+    {
+      "file": "014-invalid-confidence-out-of-range.json",
+      "expected_valid": false,
+      "json_schema_alone_sufficient": true,
+      "description": "observations[].confidence, if present, must be in the closed interval [0, 1]."
+    }
+  ]
+}

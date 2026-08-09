@@ -1,0 +1,54 @@
+id: consumer-complaint
+name: Consumer complaint
+version: 0.1.0
+jurisdiction: general
+privacy_rules:
+  - kind: postcode
+    label: UK postcode
+    pattern: '\b(?:GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b'
+    flags: gi
+  - kind: national_insurance
+    label: National Insurance number
+    pattern: '\b(?!BG|GB|KN|NK|NT|TN|ZZ)[A-CEGHJ-PR-TW-Z]{2}\s?\d{2}\s?\d{2}\s?\d{2}\s?[A-D]\b'
+    flags: gi
+  - kind: driving_licence
+    label: UK driving licence number
+    pattern: '\b[A-Z9]{5}\d{6}[A-Z9]{2}\d[A-Z]{2}\b'
+    flags: g
+categories:
+  - id: complaint_details
+    name: Complaint details
+    requirement: required
+    description: Explain what happened and the outcome you want.
+    accepted_types: [note]
+  - id: proof_of_purchase
+    name: Proof of purchase
+    requirement: required
+    description: A receipt, order confirmation or other transaction record.
+    accepted_types: [pdf, image, webpage]
+  - id: product_information
+    name: Product or service information
+    requirement: recommended
+    description: The description or claims shown when you bought it.
+    accepted_types: [pdf, image, webpage]
+  - id: problem_evidence
+    name: Problem evidence
+    requirement: required
+    description: Evidence of the fault, failure or disputed issue.
+    accepted_types: [pdf, image, webpage, note]
+  - id: correspondence
+    name: Seller correspondence
+    requirement: recommended
+    description: Contact attempts and responses from the seller.
+    accepted_types: [pdf, image, webpage]
+  - id: terms_and_policy
+    name: Relevant terms or policy
+    requirement: recommended
+    description: Refund, warranty or other applicable terms.
+    accepted_types: [pdf, image, webpage]
+  - id: supporting_evidence
+    name: Supporting evidence
+    requirement: optional
+    description: Any other material that helps explain the complaint.
+    accepted_types: [pdf, image, webpage, note]
+export_sections: [cover, complaint_summary, requested_resolution, evidence_checklist, timeline, evidence_index, evidence_documents, source_manifest]
