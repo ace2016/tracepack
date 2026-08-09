@@ -32,6 +32,3 @@ This program does not exist yet as a packaged offering you can sign up for on yo
 there is no price list or signup flow today. If you want to talk about a commercial license,
 email [licensing@tracepack.org](mailto:licensing@tracepack.org) with what you want to build
 and which part of the codebase it touches. Terms are negotiated case by case for now.
-
-This inbox needs to actually exist and be monitored before this document is published; treat
-that as a prerequisite, not a detail to fix later.
