@@ -22,8 +22,17 @@
 // Nothing else is mocked: storage runs against a real (fake) IndexedDB, and import/export run
 // as real code.
 
+import { createRequire } from "node:module";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "fake-indexeddb/auto";
+
+// See packages/export-engine/tests/pack.test.ts for why this is here: without it, pdfjs falls
+// back to a slower embedded-font guess and warns about it, this resolves its real bundled
+// standard_fonts directory instead. A plain filesystem path, not a file:// URL, since the
+// legacy Node build reads it with `fs`, not `fetch`.
+const pdfjsPackageJson = createRequire(import.meta.url).resolve("pdfjs-dist/package.json");
+const standardFontDataUrl = path.join(path.dirname(pdfjsPackageJson), "standard_fonts") + path.sep;
 
 const inspectPdf = vi.fn();
 vi.mock("@tracepack/document-engine", async (importOriginal) => {
@@ -109,7 +118,7 @@ describe("clean-room producer: Consumer Rights Helper", () => {
 
     // 14: the exported PDF attributes the observation to the producer, never to Tracepack.
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const doc = await pdfjs.getDocument({ data: packBytes }).promise;
+    const doc = await pdfjs.getDocument({ data: packBytes, standardFontDataUrl }).promise;
     let fullText = "";
     for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
       const content = await (await doc.getPage(pageNumber)).getTextContent();

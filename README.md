@@ -58,17 +58,18 @@ apps/
   website/      marketing site -- deployed at tracepack.org
   developer/    developer landing page (CLI/SDK/format) -- deployed at dev.tracepack.org
 packages/
-  evidence-core/          domain model (projects, evidence items, categories) -- published
-                           standalone on npm, zero framework/runtime dependency
+  evidence-core/          domain model (projects, evidence items, categories) -- built to
+                           publish standalone on npm, zero framework/runtime dependency
   evidence-sdk/           the tracepack-evidence v1 contract's portable half: types, schema
-                           validation, RFC 8785 canonicalization -- published standalone on npm
+                           validation, RFC 8785 canonicalization -- built to publish standalone
+                           on npm
   evidence-interchange/   tracepack-evidence v1 import into Tracepack itself (uses evidence-sdk
                            plus document-engine/storage, so this part stays Tracepack-internal)
   document-engine/        PDF text extraction, PII detection, redaction
   export-engine/          PDF pack, JSON manifest, .tracepack bundle builders
   storage/                IndexedDB persistence
-  template-engine/        loads and validates template.yaml definitions -- published standalone
-                           on npm
+  template-engine/        loads and validates template.yaml definitions -- built to publish
+                           standalone on npm
   cli/                    @tracepack/cli -- validates a template.yaml or an evidence payload,
                            and diffs two exported manifest.json files, from the command line,
                            outside the browser
@@ -124,6 +125,14 @@ See [`GOVERNANCE.md`](GOVERNANCE.md) for who maintains this project and how deci
 ## Security
 
 See [`SECURITY.md`](SECURITY.md) for the trust model and how to report a vulnerability.
+
+## Privacy
+
+See [`PRIVACY.md`](PRIVACY.md) for who is responsible for what data Tracepack's websites and
+support channels process, kept in sync with the same policy published at
+[docs.tracepack.org](https://docs.tracepack.org). This is separate from `SECURITY.md`'s trust
+model, which covers what the product itself does with evidence in your browser, not who
+Spendmita Ltd is or what the company processes.
 
 ## Licence
 

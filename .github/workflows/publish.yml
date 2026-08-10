@@ -1,0 +1,57 @@
+name: Publish packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build publishable SDK packages
+        run: pnpm run build:sdk
+
+      - name: Build CLI package
+        run: pnpm --filter @tracepack/cli build
+
+      - name: Typecheck all packages
+        run: pnpm -r typecheck
+
+      - name: Test all packages
+        run: pnpm -r test
+
+      - name: Publish evidence-core
+        run: pnpm --filter @tracepack/evidence-core publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish evidence-sdk
+        run: pnpm --filter @tracepack/evidence-sdk publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish template-engine
+        run: pnpm --filter @tracepack/template-engine publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish cli
+        run: pnpm --filter @tracepack/cli publish --access public --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

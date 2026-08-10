@@ -55,4 +55,4 @@ See [`../../templates/`](../../templates/) in the Tracepack repository for real,
 
 ## License
 
-MIT
+Apache-2.0

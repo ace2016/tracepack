@@ -63,4 +63,4 @@ console.log(getCategoryProgress(project));
 
 ## License
 
-MIT
+Apache-2.0

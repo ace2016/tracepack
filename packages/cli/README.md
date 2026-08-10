@@ -95,4 +95,4 @@ your own code instead of the command line.
 
 ## License
 
-MIT
+Apache-2.0

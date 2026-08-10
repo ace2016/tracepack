@@ -112,4 +112,4 @@ ship as a new major version of this package.
 
 ## License
 
-MIT
+Apache-2.0

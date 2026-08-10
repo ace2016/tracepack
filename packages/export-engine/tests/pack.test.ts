@@ -1,7 +1,22 @@
+import { createRequire } from "node:module";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { buildEvidencePack, buildManifest } from "../src/index";
 import { diffManifests, looksLikeTracepackManifest, type TracepackManifest, type TracepackProject } from "@tracepack/evidence-core";
+
+// Without this, pdfjs falls back to measuring glyphs from an embedded-font guess instead of
+// its real standard font metrics, which is what the "Ensure that the standardFontDataUrl API
+// parameter is provided" warning is about. That fallback is slower per page, not just noisy,
+// and is the actual cause of this suite occasionally brushing up against vitest's default
+// 5000ms test timeout on a loaded CI runner. pdfjs-dist ships these fonts in its own package;
+// `createRequire` resolves its real install location instead of guessing a relative path to
+// it. (`import.meta.resolve` would do the same thing, but isn't implemented by vitest's SSR
+// module transform, and throws at runtime here.) The legacy Node build reads this path with
+// plain `fs` calls, not `fetch`, so it needs a filesystem path, not a `file://` URL -- a
+// trailing slash is required, pdfjs appends filenames directly onto this string.
+const pdfjsPackageJson = createRequire(import.meta.url).resolve("pdfjs-dist/package.json");
+const standardFontDataUrl = path.join(path.dirname(pdfjsPackageJson), "standard_fonts") + path.sep;
 
 describe("evidence pack", () => {
   it("creates a valid cover and index PDF", async () => {
@@ -50,7 +65,7 @@ describe("evidence pack", () => {
     // have; its "legacy" build is the one meant to run outside a browser, so tests use
     // that instead of pulling in a jsdom environment just to read text back out of a PDF.
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), standardFontDataUrl }).promise;
     const notePage = await document_.getPage(3);
     const content = await notePage.getTextContent();
     const pageText = content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
@@ -77,7 +92,7 @@ describe("evidence pack", () => {
     expect(exported.getPageCount()).toBe(4);
 
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), standardFontDataUrl }).promise;
     const observationsPage = await document_.getPage(4);
     const content = await observationsPage.getTextContent();
     const pageText = content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
@@ -110,7 +125,7 @@ describe("evidence pack", () => {
     const blob = await buildEvidencePack(project, new Map([["e1", noteBlob]]));
     const exported = await PDFDocument.load(await blob.arrayBuffer());
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), standardFontDataUrl }).promise;
     let fullText = "";
     for (let pageNumber = 1; pageNumber <= document_.numPages; pageNumber += 1) {
       const content = await (await document_.getPage(pageNumber)).getTextContent();
@@ -134,7 +149,7 @@ describe("evidence pack", () => {
     };
     const blob = await buildEvidencePack(project, new Map([["e1", noteBlob]]));
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), standardFontDataUrl }).promise;
     let fullText = "";
     for (let pageNumber = 1; pageNumber <= document_.numPages; pageNumber += 1) {
       const content = await (await document_.getPage(pageNumber)).getTextContent();
@@ -161,7 +176,7 @@ describe("evidence pack", () => {
     expect(exported.getPageCount()).toBe(4);
 
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) }).promise;
+    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), standardFontDataUrl }).promise;
     let fullText = "";
     for (let pageNumber = 1; pageNumber <= document_.numPages; pageNumber += 1) {
       const content = await (await document_.getPage(pageNumber)).getTextContent();
