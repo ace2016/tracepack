@@ -126,6 +126,25 @@ describe("importEvidencePayload", () => {
     expect(secondImport.project.evidence[0]?.contentHash).toBe(item.contentHash);
   });
 
+  // Regression: the synthesized note's privacyFindings used to be computed from only its
+  // title (producer-supplied evidence_type), never its actual rendered body, the observation
+  // text a producer chose to surface, which can legitimately contain PII a producer never
+  // redacted. A user reviewing this item's PII findings would see none even though the body
+  // they're actually looking at (extractedText) contains a real email address.
+  it("scans the synthesized note's rendered body text for PII, not just its title", async () => {
+    const payload = clone();
+    payload.attachments = [];
+    payload.observations = [
+      { id: "obs-1", kind: "conversation_summary", label: "Support conversation summary", detail: "Customer buyer@example.com reported the item arrived damaged." },
+    ];
+    payload.integrity.payload_hash = await computePayloadHash(payload);
+
+    const result = await importEvidencePayload(payload, { project: baseProject(), categoryId: "complaint_details" });
+    const item = result.project.evidence[0]!;
+    expect(item.extractedText).toContain("buyer@example.com");
+    expect(item.privacyFindings?.some((finding) => finding.kind === "email")).toBe(true);
+  });
+
   it("rejects an attachment whose bytes don't match its declared content_hash, and imports nothing", async () => {
     const payload = clone();
     payload.attachments[0].content_hash = "0".repeat(64);

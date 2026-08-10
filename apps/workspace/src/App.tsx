@@ -5,7 +5,7 @@ import { buildEvidencePack, downloadEpackBundle, downloadJson, downloadTracepack
 import { deleteProject, getEvidenceFile, getProject, listProjects, saveEvidenceFile, saveProject } from "@tracepack/storage";
 import { parseTemplateObject } from "@tracepack/template-engine";
 import { templates } from "./template";
-import { countPendingCaptures, guessTemplate, importPendingCaptures, peekLatestPendingCapture } from "./captures";
+import { countPendingCaptures, explainTemplateMatch, guessTemplate, importPendingCaptures, jobFromExternalPayload, peekLatestPendingCapture, seedFromExternalPayload } from "./captures";
 import { checkIncomingEvidence, importExternalEvidence, isEvidenceMessage, READY_MESSAGE } from "./externalImport";
 import type { TracepackEvidencePayloadV1 } from "@tracepack/evidence-sdk";
 import { Onboarding } from "./Onboarding";
@@ -54,6 +54,7 @@ export function App() {
   const [appError, setAppError] = useState("");
   const [pendingCaptures, setPendingCaptures] = useState(0);
   const [recommendedTemplate, setRecommendedTemplate] = useState<TemplateSnapshot>();
+  const [recommendationReason, setRecommendationReason] = useState<string>();
   const [pendingExternalPayload, setPendingExternalPayload] = useState<TracepackEvidencePayloadV1>();
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateSnapshot>(templates[0]!);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -75,11 +76,20 @@ export function App() {
 
   // Same idea, one screen earlier: peek what the waiting capture actually was (not just how
   // many) and guess which template fits it, so a user who captured an auction listing sees
-  // Provenance Trace suggested instead of having to already know it exists.
+  // Provenance Trace suggested instead of having to already know it exists. A pending external
+  // payload (the "Send to Tracepack" handoff, see ExternalImport below) is checked and scored
+  // against its own text via jobFromExternalPayload. It takes priority over a capture peek
+  // since a pending external payload is what actually sent the user to this screen.
   useEffect(() => {
-    if (view !== "home") { setRecommendedTemplate(undefined); return; }
-    void peekLatestPendingCapture().then((job) => setRecommendedTemplate(job ? guessTemplate(job, templates) : undefined));
-  }, [view, pendingCaptures]);
+    if (view !== "home") { setRecommendedTemplate(undefined); setRecommendationReason(undefined); return; }
+    function apply(job: { title: string; url: string } | undefined) {
+      const match = job ? guessTemplate(job, templates) : undefined;
+      setRecommendedTemplate(match);
+      setRecommendationReason(match && job ? explainTemplateMatch(job, match.id) : undefined);
+    }
+    if (pendingExternalPayload) { apply(jobFromExternalPayload(pendingExternalPayload)); return; }
+    void peekLatestPendingCapture().then(apply);
+  }, [view, pendingCaptures, pendingExternalPayload]);
 
   const refresh = async () => {
     try { setProjects(await listProjects()); setAppError(""); }
@@ -252,8 +262,8 @@ export function App() {
     </header>
     {appError && <div className="page"><div className="alert" role="alert">{appError}</div></div>}
     <div ref={viewContent} tabIndex={-1} className="view-outlet">
-      {view === "home" && <Home projects={projects} open={(item) => void open(item)} start={(template) => { setSelectedTemplate(template); setView("new"); }} buildOwn={() => setView("custom")} remove={remove} pendingCaptures={pendingCaptures} pendingExternal={!!pendingExternalPayload} recommendedTemplate={recommendedTemplate} />}
-      {view === "new" && <NewProject template={selectedTemplate} onSubmit={create} cancel={() => setView("home")} />}
+      {view === "home" && <Home projects={projects} open={(item) => void open(item)} start={(template) => { setSelectedTemplate(template); setView("new"); }} buildOwn={() => setView("custom")} remove={remove} pendingCaptures={pendingCaptures} pendingExternal={!!pendingExternalPayload} recommendedTemplate={recommendedTemplate} recommendationReason={recommendationReason} />}
+      {view === "new" && <NewProject template={selectedTemplate} seed={pendingExternalPayload ? seedFromExternalPayload(pendingExternalPayload) : undefined} onSubmit={create} cancel={() => setView("home")} />}
       {view === "custom" && <CustomTemplate onBuilt={(template) => { setSelectedTemplate(template); setView("new"); }} cancel={() => setView("home")} />}
       {view === "external-import" && <ExternalImport
         projects={projects}
@@ -274,7 +284,7 @@ export function App() {
   </div>;
 }
 
-function Home({ projects, open, start, buildOwn, remove, pendingCaptures, pendingExternal, recommendedTemplate }: { projects: TracepackProject[]; open: (p: TracepackProject) => void; start: (template: TemplateSnapshot) => void; buildOwn: () => void; remove: (p: TracepackProject) => void; pendingCaptures: number; pendingExternal: boolean; recommendedTemplate?: TemplateSnapshot }) {
+function Home({ projects, open, start, buildOwn, remove, pendingCaptures, pendingExternal, recommendedTemplate, recommendationReason }: { projects: TracepackProject[]; open: (p: TracepackProject) => void; start: (template: TemplateSnapshot) => void; buildOwn: () => void; remove: (p: TracepackProject) => void; pendingCaptures: number; pendingExternal: boolean; recommendedTemplate?: TemplateSnapshot; recommendationReason?: string }) {
   const defaultTemplate = templates[0]!;
   // A recommendation matching the default template is already covered by the primary button
   // below, so it only changes anything when it points somewhere else -- no need to duplicate
@@ -287,8 +297,12 @@ function Home({ projects, open, start, buildOwn, remove, pendingCaptures, pendin
       <h1>Build a clear evidence pack from scattered files.</h1>
       <p className="lede">Files, captures and external evidence become one traceable case, reviewed for privacy and organised by what it's for, without leaving your device.</p>
       {recommendation && <div className="template-recommend">
-        <span className="recommend-tag">Recommended for your capture</span>
-        <p>Matches the page you captured. You can still pick something else below.</p>
+        <span className="recommend-tag">Suggested from the evidence</span>
+        <p className="recommend-name">{recommendation.name}</p>
+        {/* Not "RECOMMENDED FOR THIS CONVERSATION", Tracepack can receive evidence from a
+            capture or a producer payload, not only a support conversation, and the whole point
+            of stating a reason is to be specific, not to overclaim what was actually detected. */}
+        <p>{recommendationReason ? `The imported material contains ${recommendationReason}.` : "Matches what was imported."} You can choose another structure below.</p>
       </div>}
       <div className="actions">
         <button className="btn btn-primary" type="button" onClick={() => start(recommendation ?? defaultTemplate)}>{recommendation ? `Start a ${recommendation.name} pack` : "Create a pack"}</button>
@@ -562,21 +576,49 @@ function CustomTemplate({ onBuilt, cancel }: { onBuilt: (template: TemplateSnaps
   </main>;
 }
 
-function NewProject({ template, onSubmit, cancel }: { template: TemplateSnapshot; onSubmit: (e: FormEvent<HTMLFormElement>) => void; cancel: () => void }) {
+function NewProject({ template, seed, onSubmit, cancel }: { template: TemplateSnapshot; seed?: { title?: string; summary?: string }; onSubmit: (e: FormEvent<HTMLFormElement>) => void; cancel: () => void }) {
   return <main className="page narrow">
     <button className="back-link" onClick={cancel}>&larr; Back to home</button>
     <p className="eyebrow">{template.name} template</p>
     <h1>Start with the basics</h1>
-    <p className="lede">You only need a pack title now. Everything else can be completed later.</p>
+    <p className="lede">{seed ? "Filled in from the evidence you're adding. Change anything before creating the pack." : "You only need a pack title now. Everything else can be completed later."}</p>
     <form className="form" onSubmit={onSubmit}>
-      <label>Pack title <span>Required</span><input name="title" required placeholder="Faulty kettle complaint" /></label>
+      <label>Pack title <span>Required</span><input name="title" required placeholder="Faulty kettle complaint" defaultValue={seed?.title ?? ""} /></label>
       <label>Seller or organisation<input name="organisation" placeholder="Example Retail Ltd" /></label>
-      <label>{template.summaryLabel ?? "What happened"}<textarea name="summary" rows={4} placeholder={template.summaryPlaceholder ?? "Describe the purchase, problem and contact so far."} /></label>
+      <label>{template.summaryLabel ?? "What happened"}<textarea name="summary" rows={4} placeholder={template.summaryPlaceholder ?? "Describe the purchase, problem and contact so far."} defaultValue={seed?.summary ?? ""} /></label>
       <label>{template.resolutionLabel ?? "Desired resolution"}<input name="resolution" placeholder={template.resolutionPlaceholder ?? "Refund, replacement or another outcome"} /></label>
       <label>Key date<input name="keyDate" type="date" /></label>
       <div className="actions"><button className="btn btn-primary">Create pack</button><button type="button" className="btn btn-secondary" onClick={cancel}>Cancel</button></div>
     </form>
   </main>;
+}
+
+// Consolidates signals that already exist scattered across the workspace, privacy review, and
+// export preview pages (evidence count, unresolved findings, required-category progress) plus
+// two that don't have a surface anywhere yet (provenance, a computed export-readiness label)
+// into one at-a-glance panel. Additive next to the existing progress-panel, not a replacement.
+function PackOverview({ project }: { project: TracepackProject }) {
+  const activeEvidence = project.evidence.filter((item) => item.reviewStatus !== "excluded");
+  const findings = activeEvidence.flatMap((item) => item.privacyFindings ?? []);
+  const unresolvedFindings = findings.filter((finding) => finding.decision === "unreviewed").length;
+  const reviewedFindings = findings.length - unresolvedFindings;
+  const datedItems = activeEvidence.filter((item) => item.eventDate).length;
+  const chronologyGaps = getChronologyGaps(project).length;
+  const required = getRequiredSummary(project);
+  const missingRequired = required.total - required.complete;
+  const producers = new Set(
+    activeEvidence.map((item) => item.provenance?.producerId).filter((id): id is string => !!id),
+  );
+  const needsAttention = unresolvedFindings > 0 || missingRequired > 0;
+
+  return <section className="pack-overview" aria-label="Pack overview">
+    <div className="overview-tile"><span className="overview-label">Evidence</span><strong>{activeEvidence.length}</strong><span className="overview-detail">item{activeEvidence.length === 1 ? "" : "s"}</span></div>
+    <div className="overview-tile"><span className="overview-label">Chronology</span><strong>{datedItems}</strong><span className="overview-detail">{chronologyGaps > 0 ? `${chronologyGaps} gap${chronologyGaps === 1 ? "" : "s"} flagged` : "dated item" + (datedItems === 1 ? "" : "s")}</span></div>
+    <div className="overview-tile"><span className="overview-label">Privacy</span><strong>{reviewedFindings}</strong><span className="overview-detail">{unresolvedFindings > 0 ? `${unresolvedFindings} unresolved` : "reviewed"}</span></div>
+    <div className="overview-tile"><span className="overview-label">Requirements</span><strong>{missingRequired}</strong><span className="overview-detail">{missingRequired === 0 ? "all set" : "missing"}</span></div>
+    <div className="overview-tile"><span className="overview-label">Provenance</span><strong>{producers.size}</strong><span className="overview-detail">external producer{producers.size === 1 ? "" : "s"}</span></div>
+    <div className={`overview-tile overview-readiness ${needsAttention ? "needs-attention" : "ready"}`}><span className="overview-label">Export readiness</span><strong>{needsAttention ? "Needs attention" : "Ready"}</strong><span className="overview-detail">against this pack's own template, not a legal opinion</span></div>
+  </section>;
 }
 
 function Workspace({ project, notice, importFiles, addNote, fileInput, update, navigate }: { project: TracepackProject; notice: string; importFiles: (f: FileList | null) => void; addNote: (categoryId: string, title: string, body: string) => void; fileInput: React.RefObject<HTMLInputElement | null>; update: (p: TracepackProject) => void; navigate: (v: View) => void }) {
@@ -603,6 +645,7 @@ function Workspace({ project, notice, importFiles, addNote, fileInput, update, n
     <div className="workspace-title"><div><p className="eyebrow">{project.template.name}</p><h1>{project.title}</h1><p>{project.organisation || "No organisation added"}</p></div>
       <div className="actions"><button className="btn btn-secondary" onClick={() => navigate("privacy")}>Privacy review {findingCount ? `(${findingCount})` : ""}</button><button className="btn btn-secondary" onClick={() => navigate("timeline")}>Timeline</button><button className="btn btn-primary" onClick={() => navigate("export")}>Preview export</button></div>
     </div>
+    <PackOverview project={project} />
     <section className="progress-panel"><div><strong>{summary.total === 0 ? "This template has no required categories" : `${summary.complete} of ${summary.total} required categories complete`}</strong><p>Tracepack explains gaps using categories and reasons, not a mystery score.</p></div>{summary.total > 0 && <div className="segments" role="progressbar" aria-label="Required categories complete" aria-valuenow={summary.complete} aria-valuemin={0} aria-valuemax={summary.total} aria-valuetext={`${summary.complete} of ${summary.total} required categories complete`}>{Array.from({ length: summary.total }, (_, i) => <span key={i} aria-hidden="true" className={i < summary.complete ? "filled" : ""} />)}</div>}</section>
     {notice && <div className="alert" role="alert">{notice}</div>}
     <div className="workspace-grid">

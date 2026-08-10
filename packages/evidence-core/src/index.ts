@@ -21,6 +21,14 @@ export interface EvidenceCategory {
   // photos, not the same closed-union problem as PrivacyFindingKind/SourceType, just a plain
   // number a template can opt into.
   minItems?: number;
+  // Optional Tracepack-owned tag for a semantic concept a category represents, e.g.
+  // "correspondence". Not part of the frozen tracepack-evidence v1 payload contract (a
+  // producer never sends this), and not the same thing as `id`, which differs per template
+  // even for categories serving the same concept ("supporting evidence" on one template,
+  // "correspondence" on another). Lets a payload's evidence_type be routed by what it
+  // represents rather than a hardcoded, template-specific category id, see
+  // guessCategoryByRole in apps/workspace/src/captures.ts.
+  role?: string;
 }
 
 // A template-declared PII pattern: "regex + label + kind", deliberately no code-level

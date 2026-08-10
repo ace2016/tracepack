@@ -40,7 +40,8 @@ categories:
     name: Seller correspondence
     requirement: recommended
     description: Contact attempts and responses from the seller.
-    accepted_types: [pdf, image, webpage]
+    accepted_types: [pdf, image, webpage, note]
+    role: correspondence
   - id: terms_and_policy
     name: Relevant terms or policy
     requirement: recommended

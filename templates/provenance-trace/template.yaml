@@ -51,6 +51,12 @@ categories:
     description: Recent photos of condition, including any known defects. At least two angles.
     accepted_types: [pdf, image, note]
     min_items: 2
+  - id: communications
+    name: Communications
+    requirement: optional
+    description: Correspondence with a seller, buyer or previous owner about the asset, disputes over its history included.
+    accepted_types: [pdf, image, webpage, note]
+    role: correspondence
   - id: supporting_evidence
     name: Supporting evidence
     requirement: optional

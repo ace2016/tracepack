@@ -56,6 +56,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .hero .actions { margin-bottom: 8px; }
 .template-recommend { margin-bottom: 18px; }
 .template-recommend .recommend-tag { display: inline-block; background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 4px 11px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.template-recommend .recommend-name { font-size: 20px; font-weight: 800; margin: 0 0 4px; }
 .template-recommend p { margin: 0; color: var(--muted); font-size: 13.5px; }
 .template-picker { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .template-picker span { color: var(--muted); font-size: 13px; }
@@ -139,6 +140,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .workspace-title { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .workspace-title h1 { font-size: clamp(30px, 4vw, 42px); margin: 4px 0; letter-spacing: -.03em; }
 .workspace-title p:last-child { color: var(--muted); margin: 0; }
+.workspace-title > div:first-child { min-width: 0; flex: 1 1 auto; }
+.workspace-title .actions { flex-wrap: nowrap; flex-shrink: 0; }
+.pack-overview { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 28px; }
+.overview-tile { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border: 1px solid var(--line); background: var(--paper); border-radius: 12px; }
+.overview-label { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+.overview-tile strong { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+.overview-detail { color: var(--muted); font-size: 12.5px; }
+.overview-readiness strong { font-size: 17px; line-height: 1.3; }
+.overview-readiness.needs-attention strong { color: #a45a1f; }
+.overview-readiness.ready strong { color: var(--accent-dark); }
 .progress-panel { display: flex; justify-content: space-between; align-items: center; gap: 25px; padding: 22px 24px; margin: 32px 0; border: 1px solid var(--line); background: var(--paper); border-radius: 14px; }
 .progress-panel p { color: var(--muted); margin: 5px 0 0; font-size: 13.5px; }
 .segments { display: flex; gap: 6px; min-width: 180px; }
@@ -149,7 +160,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .evidence-list { display: grid; gap: 12px; }
 .evidence-card { display: grid; grid-template-columns: 34px minmax(170px, 1fr) minmax(185px, .7fr); gap: 15px; align-items: start; background: var(--paper); border: 1px solid var(--line); border-radius: 13px; padding: 18px; }
 .evidence-card .num { font-family: ui-monospace, "SF Mono", "Cascadia Code", monospace; color: var(--muted); font-size: 13px; padding-top: 2px; }
-.inline-title { width: 100%; border: 0; border-bottom: 1px solid transparent; background: transparent; font-weight: 800; font-size: 15.5px; padding: 3px 0; }
+.inline-title { width: 100%; border: 0; border-bottom: 1px solid transparent; background: transparent; font-weight: 800; font-size: 15.5px; padding: 3px 0; text-overflow: ellipsis; }
 .inline-title:hover, .inline-title:focus { border-bottom-color: var(--line-strong); }
 .evidence-main p { margin: 4px 0; color: var(--muted); font-size: 12.5px; }
 .evidence-main code { font-size: 11px; color: var(--muted); }
@@ -271,10 +282,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .segments { width: 100%; }
   .topbar { padding: 0 20px; }
   .contents-block { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  .pack-overview { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 520px) {
   .page { width: min(calc(100% - 28px), 1180px); padding-top: 38px; }
   .hero { padding-top: 10px; }
+  .pack-overview { grid-template-columns: repeat(2, 1fr); }
   .card-tile { flex-direction: column; align-items: flex-start; }
   .evidence-controls { grid-template-columns: 1fr; }
   .local-label { display: none; }

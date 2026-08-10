@@ -40,6 +40,9 @@ const templateSchema = z.object({
     // Optional: how many items this category needs before it counts as satisfied. Omitted
     // (or 1) keeps today's ">0 items" behaviour -- see getCategoryProgress in evidence-core.
     min_items: z.number().int().positive().optional(),
+    // Optional Tracepack-owned semantic tag, e.g. "correspondence". See EvidenceCategory.role
+    // in evidence-core for what this is for.
+    role: z.string().min(1).optional(),
   })).min(1),
   export_sections: z.array(z.string()).min(1),
   // Optional so a template that has nothing complaint-specific to say about intake copy

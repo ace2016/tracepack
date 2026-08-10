@@ -1,9 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TemplateSnapshot, TracepackProject } from "@tracepack/evidence-core";
+import type { TracepackEvidencePayloadV1 } from "@tracepack/evidence-sdk";
 
 vi.mock("@tracepack/storage", () => ({ saveEvidenceFile: vi.fn().mockResolvedValue(undefined) }));
 
-const { guessCategory, guessTemplate, importPendingCaptures } = await import("./captures");
+const { guessCategory, guessTemplate, explainTemplateMatch, jobFromExternalPayload, seedFromExternalPayload, importPendingCaptures } = await import("./captures");
+
+function externalPayload(overrides: Partial<{ evidence_type: string; source_url: string; observations: Array<{ label: string; detail: string }>; subject: string; producer_name: string; attachments: TracepackEvidencePayloadV1["attachments"] }> = {}): TracepackEvidencePayloadV1 {
+  return {
+    schema_version: 1,
+    source: { producer_id: "com.example.producer", producer_name: overrides.producer_name ?? "Example Producer" },
+    capture_timestamp: "2026-08-09T00:00:00Z",
+    source_url: overrides.source_url,
+    evidence_type: overrides.evidence_type ?? "support_conversation",
+    attachments: overrides.attachments ?? [],
+    observations: (overrides.observations ?? []).map((entry, i) => ({ id: `obs-${i}`, kind: "note", label: entry.label, detail: entry.detail })),
+    metadata: overrides.subject ? { subject: overrides.subject } : undefined,
+    integrity: { algorithm: "sha256", canonicalization: "RFC8785", payload_hash: "0".repeat(64) },
+  };
+}
 
 function baseProject(): TracepackProject {
   return {
@@ -140,6 +155,30 @@ describe("guessCategory", () => {
     const match = guessCategory({ title: "Untitled", url: "https://example.com/x" }, categories, "pdf");
     expect(match?.id).toBe("documents");
   });
+
+  // Regression: categoryHints is keyed to Consumer Complaint's own category ids
+  // ("correspondence"), so it silently fails on any template using a different id for the same
+  // concept, e.g. Provenance Trace's "communications". A support-shaped payload used to fall
+  // through to the first category that merely accepts a note, "service_and_maintenance", which
+  // is wrong regardless of template. Role resolution fixes this for any template, not just the
+  // one case that happened to surface it.
+  it("routes correspondence-ish text to whichever category declares role: correspondence, on any template", () => {
+    const categories = [
+      { id: "service_and_maintenance", name: "Service and maintenance records", requirement: "recommended" as const, description: "", acceptedTypes: ["pdf", "image", "note"] },
+      { id: "communications", name: "Communications", requirement: "optional" as const, description: "", acceptedTypes: ["pdf", "image", "webpage", "note"], role: "correspondence" },
+    ];
+    const match = guessCategory({ title: "support_conversation", url: "" }, categories, "note");
+    expect(match?.id).toBe("communications");
+  });
+
+  it("falls back to the id-specific hint table when no category on this template has a role tag", () => {
+    const categories = [
+      { id: "correspondence", name: "Seller correspondence", requirement: "recommended" as const, description: "", acceptedTypes: ["pdf", "image", "webpage", "note"] },
+      { id: "supporting_evidence", name: "Supporting evidence", requirement: "optional" as const, description: "", acceptedTypes: ["pdf", "image", "webpage", "note"] },
+    ];
+    const match = guessCategory({ title: "support_conversation", url: "" }, categories, "note");
+    expect(match?.id).toBe("correspondence");
+  });
 });
 
 describe("guessTemplate", () => {
@@ -166,5 +205,79 @@ describe("guessTemplate", () => {
   it("does not recommend a template that isn't actually available", () => {
     const match = guessTemplate({ title: "Classic car auction", url: "https://example.com/auction" }, [template("consumer-complaint")]);
     expect(match).toBeUndefined();
+  });
+});
+
+describe("explainTemplateMatch", () => {
+  it("names the signals that actually matched, not just that something matched", () => {
+    const job = { title: "1967 Ford Mustang, restoration and matching numbers, VIN verified", url: "" };
+    const reason = explainTemplateMatch(job, "provenance-trace");
+    expect(reason).toContain("origin or history");
+  });
+
+  it("joins two matched signals into a natural phrase", () => {
+    const job = { title: "Seller correspondence regarding a refund dispute", url: "" };
+    const reason = explainTemplateMatch(job, "consumer-complaint");
+    expect(reason).toMatch(/ and /);
+  });
+
+  it("is undefined for a template with no signal table (General)", () => {
+    const reason = explainTemplateMatch({ title: "Anything at all", url: "" }, "general");
+    expect(reason).toBeUndefined();
+  });
+
+  it("is undefined when nothing actually matched", () => {
+    const reason = explainTemplateMatch({ title: "Weather forecast", url: "" }, "consumer-complaint");
+    expect(reason).toBeUndefined();
+  });
+});
+
+describe("jobFromExternalPayload", () => {
+  it("builds a job from the evidence_type and every observation's label and detail text", () => {
+    const payload = externalPayload({
+      evidence_type: "support_conversation",
+      observations: [{ label: "Support conversation summary", detail: "Dispute over a vintage motorcycle's restoration history." }],
+    });
+    const job = jobFromExternalPayload(payload);
+    expect(job.title).toContain("support conversation");
+    expect(job.title).toContain("restoration");
+  });
+
+  it("returns undefined from guessTemplate when nothing in the conversation matches any template", () => {
+    const payload = externalPayload({ observations: [{ label: "Support conversation summary", detail: "General enquiry, nothing template-specific here." }] });
+    const job = jobFromExternalPayload(payload);
+    const templates: TemplateSnapshot[] = [
+      { id: "consumer-complaint", name: "Consumer complaint", version: "1", jurisdiction: "general", categories: [], exportSections: [] },
+      { id: "provenance-trace", name: "Provenance Trace", version: "1", jurisdiction: "general", categories: [], exportSections: [] },
+    ];
+    expect(guessTemplate(job, templates)).toBeUndefined();
+  });
+});
+
+describe("seedFromExternalPayload", () => {
+  it("takes the title from metadata.subject", () => {
+    const payload = externalPayload({ subject: "Vintage motorcycle restoration dispute" });
+    expect(seedFromExternalPayload(payload).title).toBe("Vintage motorcycle restoration dispute");
+  });
+
+  it("builds the summary from structural counts only, never from observation prose", () => {
+    const payload = externalPayload({
+      producer_name: "Example Producer",
+      observations: [{ label: "Support conversation summary", detail: "Contact the customer at buyer@example.com about the refund." }],
+    });
+    const seed = seedFromExternalPayload(payload);
+    expect(seed.summary).toContain("Example Producer");
+    expect(seed.summary).toContain("1 observation");
+    // The whole point of this test: project.summary is never privacy-scanned anywhere in the
+    // app (see export-engine, which renders it straight to the PDF cover), so the raw
+    // observation detail, which can contain real PII a producer never redacted, must never end
+    // up in it, only a structural count of what was imported.
+    expect(seed.summary).not.toContain("buyer@example.com");
+    expect(seed.summary).not.toContain("Contact the customer");
+  });
+
+  it("omits the summary entirely when there is nothing to count", () => {
+    const payload = externalPayload({ observations: [], attachments: [] });
+    expect(seedFromExternalPayload(payload).summary).toBeUndefined();
   });
 });

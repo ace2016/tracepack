@@ -1,4 +1,4 @@
-import { inspectPdf, rescanFieldFindings } from "@tracepack/document-engine";
+import { detectPrivacyFindings, inspectPdf, rescanFieldFindings } from "@tracepack/document-engine";
 import { addEvidence, humanizeFilename, type EvidenceItem, type EvidenceProvenance, type ExternalObservation, type SourceType, type TracepackProject } from "@tracepack/evidence-core";
 import { saveProjectAndFiles } from "@tracepack/storage";
 import { base64ToBytes, computePayloadHash, sha256Hex, validateEvidencePayload, type ObservationV1, type SupportedAttachmentMimeType, type TracepackEvidencePayloadV1, type ValidationIssue } from "@tracepack/evidence-sdk";
@@ -193,6 +193,11 @@ export async function importEvidencePayload(input: unknown, options: ImportEvide
     const summary = renderObservationsAsText(payload);
     const blob = new Blob([summary], { type: "text/plain" });
     const contentHash = await sha256Hex(new Uint8Array(await blob.arrayBuffer()));
+    // The synthesized note's actual rendered body, the observation text a producer chose to
+    // surface, which can legitimately contain PII the producer never redacted, must go through
+    // the same scan any other note's body gets. Scanning only the title (as this used to) left
+    // the one part of this item a user would actually read unscanned.
+    const bodyFindings = detectPrivacyFindings(summary, "body", options.project.template.privacyRules);
     itemsToCreate.push({
       blob,
       item: {
@@ -202,8 +207,9 @@ export async function importEvidencePayload(input: unknown, options: ImportEvide
         size: blob.size, mimeType: "text/plain", extractedText: summary, textExtractionStatus: "complete",
         provenance, observations: observationsFor(payload, undefined),
         // The title here is producer-supplied (evidence_type) — scanned exactly like a
-        // manually-typed note title, same as the attachment path below.
-        privacyFindings: rescanFieldFindings(payload.evidence_type, undefined, [], options.project.template.privacyRules),
+        // manually-typed note title, same as the attachment path below, merged with the body
+        // scan above.
+        privacyFindings: rescanFieldFindings(payload.evidence_type, undefined, bodyFindings, options.project.template.privacyRules),
       },
     });
   } else {

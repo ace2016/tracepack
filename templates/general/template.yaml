@@ -22,7 +22,8 @@ categories:
     name: Correspondence
     requirement: optional
     description: Messages, emails or other communication relevant to this record.
-    accepted_types: [pdf, image, webpage]
+    accepted_types: [pdf, image, webpage, note]
+    role: correspondence
   - id: notes
     name: Notes
     requirement: optional
