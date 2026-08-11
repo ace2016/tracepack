@@ -20,7 +20,7 @@
     "@tracepack/storage": "workspace:*",
     "@types/node": "^24.0.0",
     "fake-indexeddb": "^6.2.5",
-    "pdfjs-dist": "5.4.624",
+    "pdfjs-dist": "6.2.108",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }
