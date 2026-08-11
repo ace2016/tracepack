@@ -20,6 +20,12 @@ function describeStorageError(error: unknown): string {
   if (error instanceof DOMException && (error.name === "QuotaExceededError" || error.code === 22)) {
     return "Local storage is full. Free up space in this browser (or remove older packs) and try again.";
   }
+  // Safari's Private Browsing mode restricts IndexedDB and refuses to store Blob/File data at
+  // all, throwing this exact message. The generic error.message fallback below would otherwise
+  // surface that raw browser string verbatim, which does not tell anyone what to actually do.
+  if (error instanceof DOMException && error.message.includes("preparing Blob/File data")) {
+    return "Private Browsing mode in Safari cannot store files for this app. Open it in a regular tab instead and try again.";
+  }
   if (error instanceof Error) return error.message;
   return "Local storage is unavailable in this browser. Private browsing modes or storage-blocking settings can cause this.";
 }
@@ -185,7 +191,10 @@ export function App() {
         };
         if (inspection.sourceType === "pdf") {
           try { const pdf = await inspectPdf(file, next.template.privacyRules); item = { ...item, pageCount: pdf.pageCount, extractedText: pdf.text, textExtractionStatus: pdf.textStatus, privacyFindings: pdf.findings }; }
-          catch { item = { ...item, textExtractionStatus: "failed" }; }
+          // The badge alone never explains why. Logged for anyone with devtools open (the
+          // author included) since a worker load failure, a corrupt file, and a password-
+          // protected PDF are all invisible from the UI otherwise.
+          catch (error) { console.error(`PDF text extraction failed for "${file.name}":`, error); item = { ...item, textExtractionStatus: "failed" }; }
         }
         // A file's own name (and the title Tracepack derives from it) can carry PII just
         // as easily as the document body — scanned the same way, merged alongside any
@@ -701,12 +710,20 @@ function EvidenceCard({ item, index, project, patch }: { item: EvidenceItem; ind
 
 function PrivacyReview({ project, update, back }: { project: TracepackProject; update: (p: TracepackProject) => void; back: () => void }) {
   const findings = project.evidence.flatMap((item) => (item.privacyFindings ?? []).map((finding) => ({ item, finding })));
+  // "image" and "webpage" items are never content-scanned (no OCR, only PDF text and typed/title
+  // text). Surfaced unconditionally here, not only inside the findings.length === 0 empty state,
+  // so a clean-looking pack with one scanned PDF can't hide an unscanned screenshot full of PII.
+  const unscannedItems = project.evidence.filter((item) => item.reviewStatus !== "excluded" && (item.sourceType === "image" || item.sourceType === "webpage"));
   function decide(itemId: string, findingId: string, decision: PrivacyFinding["decision"]) { void update({ ...project, updatedAt: new Date().toISOString(), evidence: project.evidence.map((item) => item.id !== itemId ? item : { ...item, privacyFindings: (item.privacyFindings ?? []).map((finding) => finding.id === findingId ? { ...finding, decision } : finding) }) }); }
   return <main className="page narrow">
     <button className="back-link" onClick={back}>&larr; Back to workspace</button>
     <p className="eyebrow">Human review required</p><h1>Privacy review</h1>
     <p className="lede">Tracepack flags patterns in extracted PDF text, evidence titles and filenames. A match is not automatically removed and may be a false positive.</p>
-    {findings.length === 0 ? <div className="empty" style={{ marginTop: 30 }}><h3>No patterns detected</h3><p>Image-only pages are not scanned without optional OCR.</p></div> : <div className="finding-list">{findings.map(({ item, finding }) => { const isBody = (finding.field ?? "body") === "body"; const removable = !isBody || !!finding.location; const foundIn = finding.field === "title" ? "title" : finding.field === "filename" ? "filename" : finding.location ? `page ${finding.location.pageNumber}` : undefined; return <article className="finding-card" key={`${item.id}-${finding.id}`}><div><span className="warning-pill">{finding.label}</span><h3>{finding.value}</h3><p>{finding.excerpt}</p><small>Found in {item.title}{foundIn ? `, ${foundIn}` : ""}</small></div><div className="actions"><button className={finding.decision === "keep" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decide(item.id, finding.id, "keep")}>Keep</button><button className={finding.decision === "remove" ? "btn btn-primary" : "btn btn-secondary"} disabled={!removable} title={!removable ? "Re-import this PDF to create a redaction location." : undefined} onClick={() => decide(item.id, finding.id, "remove")}>Mark for removal</button></div></article>; })}</div>}
+    {unscannedItems.length > 0 && <div className="alert" role="alert" style={{ marginTop: 20 }}>
+      <strong>{unscannedItems.length} item{unscannedItems.length === 1 ? "" : "s"} not scanned for content.</strong>
+      <p>Tracepack cannot read text inside an image or a screenshot, there is no OCR built in. Look at {unscannedItems.length === 1 ? "it" : "each of these"} yourself before exporting: {unscannedItems.map((item) => item.title).join(", ")}.</p>
+    </div>}
+    {findings.length === 0 ? <div className="empty" style={{ marginTop: 30 }}><h3>No patterns detected in scanned text</h3><p>Extracted PDF text, evidence titles and filenames were checked; nothing matched.</p></div> : <div className="finding-list">{findings.map(({ item, finding }) => { const isBody = (finding.field ?? "body") === "body"; const removable = !isBody || !!finding.location; const foundIn = finding.field === "title" ? "title" : finding.field === "filename" ? "filename" : finding.location ? `page ${finding.location.pageNumber}` : undefined; return <article className="finding-card" key={`${item.id}-${finding.id}`}><div><span className="warning-pill">{finding.label}</span><h3>{finding.value}</h3><p>{finding.excerpt}</p><small>Found in {item.title}{foundIn ? `, ${foundIn}` : ""}</small></div><div className="actions"><button className={finding.decision === "keep" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decide(item.id, finding.id, "keep")}>Keep</button><button className={finding.decision === "remove" ? "btn btn-primary" : "btn btn-secondary"} disabled={!removable} title={!removable ? "Re-import this PDF to create a redaction location." : undefined} onClick={() => decide(item.id, finding.id, "remove")}>Mark for removal</button></div></article>; })}</div>}
     <div className="alert" style={{ marginTop: 30 }}><strong>Originals stay unchanged.</strong> Marked findings with page locations are irreversibly flattened in the exported PDF; marked title/filename findings have the matched text replaced wherever they are shown in an export. Older body findings without locations must be re-imported before they can be removed safely.</div>
   </main>;
 }
