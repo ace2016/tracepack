@@ -711,9 +711,14 @@ function EvidenceCard({ item, index, project, patch }: { item: EvidenceItem; ind
 function PrivacyReview({ project, update, back }: { project: TracepackProject; update: (p: TracepackProject) => void; back: () => void }) {
   const findings = project.evidence.flatMap((item) => (item.privacyFindings ?? []).map((finding) => ({ item, finding })));
   // "image" and "webpage" items are never content-scanned (no OCR, only PDF text and typed/title
-  // text). Surfaced unconditionally here, not only inside the findings.length === 0 empty state,
-  // so a clean-looking pack with one scanned PDF can't hide an unscanned screenshot full of PII.
-  const unscannedItems = project.evidence.filter((item) => item.reviewStatus !== "excluded" && (item.sourceType === "image" || item.sourceType === "webpage"));
+  // text), and a "pdf" item whose text extraction produced no layer or failed outright was never
+  // scanned either, since there was simply no text to check it against. Surfaced unconditionally
+  // here, not only inside the findings.length === 0 empty state, so a clean-looking pack with one
+  // scanned PDF can't hide an unscanned screenshot, or a PDF that failed to extract, full of PII.
+  const unscannedItems = project.evidence.filter((item) => item.reviewStatus !== "excluded" && (
+    item.sourceType === "image" || item.sourceType === "webpage" ||
+    (item.sourceType === "pdf" && (item.textExtractionStatus === "no_text_layer" || item.textExtractionStatus === "failed"))
+  ));
   function decide(itemId: string, findingId: string, decision: PrivacyFinding["decision"]) { void update({ ...project, updatedAt: new Date().toISOString(), evidence: project.evidence.map((item) => item.id !== itemId ? item : { ...item, privacyFindings: (item.privacyFindings ?? []).map((finding) => finding.id === findingId ? { ...finding, decision } : finding) }) }); }
   return <main className="page narrow">
     <button className="back-link" onClick={back}>&larr; Back to workspace</button>
@@ -721,7 +726,7 @@ function PrivacyReview({ project, update, back }: { project: TracepackProject; u
     <p className="lede">Tracepack flags patterns in extracted PDF text, evidence titles and filenames. A match is not automatically removed and may be a false positive.</p>
     {unscannedItems.length > 0 && <div className="alert" role="alert" style={{ marginTop: 20 }}>
       <strong>{unscannedItems.length} item{unscannedItems.length === 1 ? "" : "s"} not scanned for content.</strong>
-      <p>Tracepack cannot read text inside an image or a screenshot, there is no OCR built in. Look at {unscannedItems.length === 1 ? "it" : "each of these"} yourself before exporting: {unscannedItems.map((item) => item.title).join(", ")}.</p>
+      <p>Tracepack could not scan the content of {unscannedItems.length === 1 ? "this item" : "these items"}: an image or screenshot has no OCR built in, and a PDF here either has no extractable text layer or failed to extract. Look at {unscannedItems.length === 1 ? "it" : "each of these"} yourself before exporting: {unscannedItems.map((item) => item.title).join(", ")}.</p>
     </div>}
     {findings.length === 0 ? <div className="empty" style={{ marginTop: 30 }}><h3>No patterns detected in scanned text</h3><p>Extracted PDF text, evidence titles and filenames were checked; nothing matched.</p></div> : <div className="finding-list">{findings.map(({ item, finding }) => { const isBody = (finding.field ?? "body") === "body"; const removable = !isBody || !!finding.location; const foundIn = finding.field === "title" ? "title" : finding.field === "filename" ? "filename" : finding.location ? `page ${finding.location.pageNumber}` : undefined; return <article className="finding-card" key={`${item.id}-${finding.id}`}><div><span className="warning-pill">{finding.label}</span><h3>{finding.value}</h3><p>{finding.excerpt}</p><small>Found in {item.title}{foundIn ? `, ${foundIn}` : ""}</small></div><div className="actions"><button className={finding.decision === "keep" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decide(item.id, finding.id, "keep")}>Keep</button><button className={finding.decision === "remove" ? "btn btn-primary" : "btn btn-secondary"} disabled={!removable} title={!removable ? "Re-import this PDF to create a redaction location." : undefined} onClick={() => decide(item.id, finding.id, "remove")}>Mark for removal</button></div></article>; })}</div>}
     <div className="alert" style={{ marginTop: 30 }}><strong>Originals stay unchanged.</strong> Marked findings with page locations are irreversibly flattened in the exported PDF; marked title/filename findings have the matched text replaced wherever they are shown in an export. Older body findings without locations must be re-imported before they can be removed safely.</div>
