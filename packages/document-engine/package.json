@@ -7,5 +7,5 @@
   "exports": { ".": "./src/index.ts" },
   "dependencies": { "@tracepack/evidence-core": "workspace:*", "pdfjs-dist": "5.4.624" },
   "scripts": { "build": "tsc --noEmit", "typecheck": "tsc --noEmit", "test": "vitest run --passWithNoTests" },
-  "devDependencies": { "typescript": "^5.9.2", "vitest": "^3.2.4" }
+  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.10" }
 }
