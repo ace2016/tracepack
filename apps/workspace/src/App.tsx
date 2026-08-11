@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { addEvidence, createProject, getCategoryProgress, getChronologyGaps, getRequiredSummary, humanizeFilename, type EvidenceCategory, type EvidenceItem, type PrivacyFinding, type Requirement, type SourceType, type TemplateSnapshot, type TracepackProject } from "@tracepack/evidence-core";
+import { addEvidence, createProject, getCategoryProgress, getChronologyGaps, getRequiredSummary, humanizeFilename, type EvidenceCategory, type EvidenceItem, type ManualImageRedaction, type PrivacyFinding, type Requirement, type SourceType, type TemplateSnapshot, type TracepackProject } from "@tracepack/evidence-core";
 import { detectPrivacyFindings, inspectFile, inspectPdf, renderPdfPage, rescanFieldFindings, sha256 } from "@tracepack/document-engine";
 import { buildEvidencePack, downloadEpackBundle, downloadJson, downloadTracepackBundle } from "@tracepack/export-engine";
 import { deleteProject, getEvidenceFile, getProject, listProjects, saveEvidenceFile, saveProject } from "@tracepack/storage";
@@ -685,6 +685,46 @@ function NoteForm({ categories, onAdd, onCancel }: { categories: EvidenceCategor
   </form>;
 }
 
+function ImageRedactionEditor({ url, title, regions, onChange }: { url: string; title: string; regions: ManualImageRedaction[]; onChange: (regions: ManualImageRedaction[]) => void }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [drawing, setDrawing] = useState<{ x: number; y: number; width: number; height: number }>();
+  const [start, setStart] = useState<{ x: number; y: number }>();
+
+  function point(event: React.PointerEvent<HTMLDivElement>) {
+    const rect = frame.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)), y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)) };
+  }
+  function begin(event: React.PointerEvent<HTMLDivElement>) {
+    if (!url) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const next = point(event); setStart(next); setDrawing({ ...next, width: 0, height: 0 });
+  }
+  function move(event: React.PointerEvent<HTMLDivElement>) {
+    if (!start) return;
+    const next = point(event);
+    setDrawing({ x: Math.min(start.x, next.x), y: Math.min(start.y, next.y), width: Math.abs(next.x - start.x), height: Math.abs(next.y - start.y) });
+  }
+  function finish() {
+    if (drawing && drawing.width >= 0.01 && drawing.height >= 0.01) {
+      onChange([...regions, { id: crypto.randomUUID(), kind: "image-region", ...drawing, decision: "unreviewed", createdAt: new Date().toISOString() }]);
+    }
+    setStart(undefined); setDrawing(undefined);
+  }
+  return <div className="redaction-editor">
+    <p className="redaction-help"><strong>Manual image redaction</strong> Drag over each sensitive area. The original stays unchanged.</p>
+    <div className="redaction-frame" ref={frame} onPointerDown={begin} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
+      <img src={url} alt={`Preview of ${title}`} draggable={false} />
+      {[...regions, ...(drawing ? [{ id: "draft", kind: "image-region" as const, ...drawing, decision: "unreviewed" as const, createdAt: "" }] : [])].map((region) => <span key={region.id} className={`redaction-region ${region.decision}`} style={{ left: `${region.x * 100}%`, top: `${region.y * 100}%`, width: `${region.width * 100}%`, height: `${region.height * 100}%` }} />)}
+    </div>
+    <div className="redaction-toolbar">
+      <span>{regions.length} region{regions.length === 1 ? "" : "s"}</span>
+      <button className="btn-quiet" type="button" disabled={regions.length === 0} onClick={() => onChange(regions.slice(0, -1))}>Undo last</button>
+      <button className="btn-quiet" type="button" disabled={regions.length === 0} onClick={() => onChange([])}>Clear all</button>
+    </div>
+  </div>;
+}
+
 function EvidenceCard({ item, index, project, patch }: { item: EvidenceItem; index: number; project: TracepackProject; patch: (id: string, patch: Partial<EvidenceItem>) => void }) {
   const [preview, setPreview] = useState(false); const [url, setUrl] = useState(""); const canvas = useRef<HTMLCanvasElement>(null);
   // A note's content already lives on the item itself (extractedText), there is no
@@ -698,7 +738,7 @@ function EvidenceCard({ item, index, project, patch }: { item: EvidenceItem; ind
       <p><span className="warning-pill" style={{ background: "var(--ground)", color: "var(--muted)" }}>{typeLabel}</span> {item.sourceType === "note" ? "Written note" : item.originalFileName} &middot; {(item.size / 1024).toFixed(0)} KB {item.pageCount ? `· ${item.pageCount} pages` : ""}</p>
       <code title={item.contentHash}>SHA-256 {item.contentHash.slice(0, 12)}&hellip;</code>
       <div><button className="btn-quiet" aria-expanded={preview} aria-controls={`preview-${item.id}`} onClick={() => setPreview(!preview)}>{preview ? "Close preview" : "Preview"}</button>{item.textExtractionStatus === "no_text_layer" && <span className="warning-pill">No text layer</span>}{item.textExtractionStatus === "failed" && <span className="warning-pill">Text extraction failed</span>}</div>
-      {preview && <div className="document-preview" id={`preview-${item.id}`}>{item.sourceType === "pdf" ? <canvas ref={canvas} role="img" aria-label={`Preview of ${item.title}, page 1`} /> : item.sourceType === "note" ? <p style={{ whiteSpace: "pre-wrap" }}>{item.extractedText}</p> : <img src={url} alt={`Preview of ${item.title}`} />}{item.extractedText && item.sourceType !== "note" && <details><summary>Extracted text</summary><p>{item.extractedText.slice(0, 3000)}</p></details>}</div>}
+      {preview && <div className="document-preview" id={`preview-${item.id}`}>{item.sourceType === "pdf" ? <canvas ref={canvas} role="img" aria-label={`Preview of ${item.title}, page 1`} /> : item.sourceType === "note" ? <p style={{ whiteSpace: "pre-wrap" }}>{item.extractedText}</p> : <ImageRedactionEditor url={url} title={item.title} regions={item.manualRedactions ?? []} onChange={(manualRedactions) => patch(item.id, { manualRedactions })} />}{item.extractedText && item.sourceType !== "note" && <details><summary>Extracted text</summary><p>{item.extractedText.slice(0, 3000)}</p></details>}</div>}
     </div>
     <div className="evidence-controls">
       <label>Category<select value={item.categoryId} onChange={(e) => patch(item.id, { categoryId: e.target.value })}>{project.template.categories.filter((category) => category.acceptedTypes.includes(item.sourceType)).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
@@ -719,17 +759,21 @@ function PrivacyReview({ project, update, back }: { project: TracepackProject; u
     item.sourceType === "image" || item.sourceType === "webpage" ||
     (item.sourceType === "pdf" && (item.textExtractionStatus === "no_text_layer" || item.textExtractionStatus === "failed"))
   ));
+  const manualRegions = project.evidence.flatMap((item) => (item.manualRedactions ?? []).map((region) => ({ item, region })));
   function decide(itemId: string, findingId: string, decision: PrivacyFinding["decision"]) { void update({ ...project, updatedAt: new Date().toISOString(), evidence: project.evidence.map((item) => item.id !== itemId ? item : { ...item, privacyFindings: (item.privacyFindings ?? []).map((finding) => finding.id === findingId ? { ...finding, decision } : finding) }) }); }
+  function decideManual(itemId: string, regionId: string, decision: ManualImageRedaction["decision"]) { void update({ ...project, updatedAt: new Date().toISOString(), evidence: project.evidence.map((item) => item.id !== itemId ? item : { ...item, manualRedactions: (item.manualRedactions ?? []).map((region) => region.id === regionId ? { ...region, decision } : region) }) }); }
   return <main className="page narrow">
     <button className="back-link" onClick={back}>&larr; Back to workspace</button>
     <p className="eyebrow">Human review required</p><h1>Privacy review</h1>
-    <p className="lede">Tracepack flags patterns in extracted PDF text, evidence titles and filenames. A match is not automatically removed and may be a false positive.</p>
+    <p className="lede">Review automatically detected text patterns and every image region you selected. Nothing is removed from the stored original.</p>
     {unscannedItems.length > 0 && <div className="alert" role="alert" style={{ marginTop: 20 }}>
       <strong>{unscannedItems.length} item{unscannedItems.length === 1 ? "" : "s"} not scanned for content.</strong>
       <p>Tracepack could not scan the content of {unscannedItems.length === 1 ? "this item" : "these items"}: an image or screenshot has no OCR built in, and a PDF here either has no extractable text layer or failed to extract. Look at {unscannedItems.length === 1 ? "it" : "each of these"} yourself before exporting: {unscannedItems.map((item) => item.title).join(", ")}.</p>
     </div>}
-    {findings.length === 0 ? <div className="empty" style={{ marginTop: 30 }}><h3>No patterns detected in scanned text</h3><p>Extracted PDF text, evidence titles and filenames were checked; nothing matched.</p></div> : <div className="finding-list">{findings.map(({ item, finding }) => { const isBody = (finding.field ?? "body") === "body"; const removable = !isBody || !!finding.location; const foundIn = finding.field === "title" ? "title" : finding.field === "filename" ? "filename" : finding.location ? `page ${finding.location.pageNumber}` : undefined; return <article className="finding-card" key={`${item.id}-${finding.id}`}><div><span className="warning-pill">{finding.label}</span><h3>{finding.value}</h3><p>{finding.excerpt}</p><small>Found in {item.title}{foundIn ? `, ${foundIn}` : ""}</small></div><div className="actions"><button className={finding.decision === "keep" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decide(item.id, finding.id, "keep")}>Keep</button><button className={finding.decision === "remove" ? "btn btn-primary" : "btn btn-secondary"} disabled={!removable} title={!removable ? "Re-import this PDF to create a redaction location." : undefined} onClick={() => decide(item.id, finding.id, "remove")}>Mark for removal</button></div></article>; })}</div>}
-    <div className="alert" style={{ marginTop: 30 }}><strong>Originals stay unchanged.</strong> Marked findings with page locations are irreversibly flattened in the exported PDF; marked title/filename findings have the matched text replaced wherever they are shown in an export. Older body findings without locations must be re-imported before they can be removed safely.</div>
+    {findings.length === 0 && manualRegions.length === 0 ? <div className="empty" style={{ marginTop: 30 }}><h3>No patterns detected in scanned text</h3><p>Extracted PDF text, evidence titles and filenames were checked; nothing matched.</p></div> : <div className="finding-list">{findings.map(({ item, finding }) => { const isBody = (finding.field ?? "body") === "body"; const removable = !isBody || !!finding.location; const foundIn = finding.field === "title" ? "title" : finding.field === "filename" ? "filename" : finding.location ? `page ${finding.location.pageNumber}` : undefined; return <article className="finding-card" key={`${item.id}-${finding.id}`}><div><span className="warning-pill">{finding.label}</span><h3>{finding.value}</h3><p>{finding.excerpt}</p><small>Found in {item.title}{foundIn ? `, ${foundIn}` : ""}</small></div><div className="actions"><button className={finding.decision === "keep" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decide(item.id, finding.id, "keep")}>Keep</button><button className={finding.decision === "remove" ? "btn btn-primary" : "btn btn-secondary"} disabled={!removable} title={!removable ? "Re-import this PDF to create a redaction location." : undefined} onClick={() => decide(item.id, finding.id, "remove")}>Mark for removal</button></div></article>; })}
+      {manualRegions.map(({ item, region }, index) => <article className="finding-card manual-finding" key={`${item.id}-${region.id}`}><div><span className="warning-pill">Manual image region</span><h3>Selected area {index + 1}</h3><p>{Math.round(region.width * 100)}% × {Math.round(region.height * 100)}% of the image, selected for privacy review.</p><small>Found in {item.title}</small></div><div className="actions"><button className={region.decision === "keep" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decideManual(item.id, region.id, "keep")}>Do not redact</button><button className={region.decision === "remove" ? "btn btn-primary" : "btn btn-secondary"} onClick={() => decideManual(item.id, region.id, "remove")}>Redact in export</button></div></article>)}
+    </div>}
+    <div className="alert" style={{ marginTop: 30 }}><strong>Originals stay unchanged.</strong> Marked PDF findings and manual image regions are irreversibly flattened in the exported copy; marked title/filename findings have the matched text replaced wherever they are shown in an export. Older body findings without locations must be re-imported before they can be removed safely.</div>
   </main>;
 }
 
@@ -764,7 +808,7 @@ function ExportPreview({ project, update, back, navigate }: { project: Tracepack
   const required = missing.filter((entry) => entry.category.requirement === "required").length;
   const recommended = missing.filter((entry) => entry.category.requirement === "recommended").length;
   const included = project.evidence.filter((item) => item.reviewStatus !== "excluded");
-  const unresolved = project.evidence.flatMap((item) => item.privacyFindings ?? []).filter((finding) => finding.decision === "unreviewed").length;
+  const unresolved = included.flatMap((item) => [...(item.privacyFindings ?? []), ...(item.manualRedactions ?? [])]).filter((finding) => finding.decision === "unreviewed").length;
   const [phase, setPhase] = useState<ExportPhase>("idle");
   const [error, setError] = useState("");
   const [showMore, setShowMore] = useState(false);
@@ -785,7 +829,7 @@ function ExportPreview({ project, update, back, navigate }: { project: Tracepack
     const swept: TracepackProject = { ...project, evidence: project.evidence.map((item) => item.reviewStatus === "excluded" ? item : { ...item, privacyFindings: rescanFieldFindings(item.title, item.originalFileName, item.privacyFindings ?? [], project.template.privacyRules) }) };
     const sweptFindingsChanged = JSON.stringify(swept.evidence) !== JSON.stringify(project.evidence);
     if (sweptFindingsChanged) await update({ ...swept, updatedAt: new Date().toISOString() });
-    const stillUnresolved = included.flatMap((item) => swept.evidence.find((entry) => entry.id === item.id)?.privacyFindings ?? []).filter((finding) => finding.decision === "unreviewed").length;
+    const stillUnresolved = included.flatMap((item) => { const current = swept.evidence.find((entry) => entry.id === item.id); return [...(current?.privacyFindings ?? []), ...(current?.manualRedactions ?? [])]; }).filter((finding) => finding.decision === "unreviewed").length;
     if (stillUnresolved > 0) {
       setError(`${stillUnresolved} privacy finding${stillUnresolved === 1 ? "" : "s"} must be reviewed before this pack can be downloaded.`);
       return null;

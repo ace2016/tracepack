@@ -1,8 +1,75 @@
 import { redactText } from "@tracepack/document-engine";
-import type { EvidenceItem, PrivacyFinding, TracepackProject } from "@tracepack/evidence-core";
+import type { EvidenceItem, ManualImageRedaction, PrivacyFinding, TracepackProject } from "@tracepack/evidence-core";
 import { sha256Hex } from "@tracepack/evidence-sdk";
 import { strToU8, zipSync } from "fflate";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage, type Color } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, StandardFonts, rgb, type PDFFont, type PDFPage, type Color } from "pdf-lib";
+
+const IMPORTED_PAGE_FOOTER_HEIGHT = 46;
+
+function shiftCoordinatePairs(array: PDFArray | undefined, deltaY: number) {
+  if (!array) return;
+  for (let index = 1; index < array.size(); index += 2) {
+    const value = array.lookup(index, PDFNumber);
+    if (value) array.set(index, PDFNumber.of(value.asNumber() + deltaY));
+  }
+}
+
+// /InkList is an array of arrays (one stroke per sub-array), each holding its own x y x y ...
+// coordinate pairs, so it needs one level of unwrapping before shiftCoordinatePairs applies.
+function shiftInkList(array: PDFArray | undefined, deltaY: number) {
+  if (!array) return;
+  for (let index = 0; index < array.size(); index += 1) {
+    shiftCoordinatePairs(array.lookup(index, PDFArray), deltaY);
+  }
+}
+
+/**
+ * Adds room below an imported PDF page without separating annotations from their content.
+ * PDFPage.translateContent only moves the content stream, so annotation geometry must be moved
+ * by the same amount: /Rect and /QuadPoints on every annotation, plus /L (line), /Vertices
+ * (polygon/polyline), /CL (free-text callout) and /InkList (ink) for annotations that have no
+ * cached appearance stream and are re-rendered by the viewer from these raw coordinates. Every
+ * visible page box is extended upward by footerHeight, keeping its own original lower edge
+ * (never reset to the MediaBox's), so a page whose CropBox was deliberately set narrower than
+ * its MediaBox to hide content below the crop keeps that content hidden after the shift.
+ */
+function reserveImportedPageFooter(page: PDFPage, footerHeight = IMPORTED_PAGE_FOOTER_HEIGHT) {
+  const media = page.getMediaBox();
+  const crop = page.getCropBox();
+  const bleed = page.getBleedBox();
+  const trim = page.getTrimBox();
+  const art = page.getArtBox();
+
+  page.setMediaBox(media.x, media.y, media.width, media.height + footerHeight);
+  const extendBox = (box: { x: number; y: number; width: number; height: number }) => ({
+    x: box.x,
+    y: box.y,
+    width: box.width,
+    height: box.height + footerHeight,
+  });
+  const nextCrop = extendBox(crop); page.setCropBox(nextCrop.x, nextCrop.y, nextCrop.width, nextCrop.height);
+  const nextBleed = extendBox(bleed); page.setBleedBox(nextBleed.x, nextBleed.y, nextBleed.width, nextBleed.height);
+  const nextTrim = extendBox(trim); page.setTrimBox(nextTrim.x, nextTrim.y, nextTrim.width, nextTrim.height);
+  const nextArt = extendBox(art); page.setArtBox(nextArt.x, nextArt.y, nextArt.width, nextArt.height);
+
+  page.translateContent(0, footerHeight);
+  const annotations = page.node.Annots();
+  if (!annotations) return;
+  for (let index = 0; index < annotations.size(); index += 1) {
+    const annotation = annotations.lookup(index, PDFDict);
+    if (!annotation) continue;
+    // lookupMaybe, not lookup: these keys are optional on any given annotation subtype (a Link
+    // has no /L, a Line has no /Rect on some producers' output), and the typed lookup() throws
+    // rather than returning undefined when a key is simply absent. lookupMaybe is the variant
+    // that tolerates that.
+    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("Rect"), PDFArray), footerHeight);
+    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("QuadPoints"), PDFArray), footerHeight);
+    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("L"), PDFArray), footerHeight);
+    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("Vertices"), PDFArray), footerHeight);
+    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("CL"), PDFArray), footerHeight);
+    shiftInkList(annotation.lookupMaybe(PDFName.of("InkList"), PDFArray), footerHeight);
+  }
+}
 
 // A title/filename PII finding marked "remove" is never flattened into a page image (there
 // is no page) — it is removed by substituting the matched text wherever the field is
@@ -140,6 +207,41 @@ async function convertWebpToPng(blob: Blob): Promise<ArrayBuffer> {
   }
 }
 
+export async function flattenImageRedactions(source: Blob, regions: ManualImageRedaction[]): Promise<RasterizedPage> {
+  if (regions.some((region) => region.decision === "unreviewed")) {
+    throw new Error("Manual image redactions must be reviewed before export.");
+  }
+  const removals = regions.filter((region) => region.decision === "remove");
+  const bitmap = await createImageBitmap(source);
+  try {
+    if (typeof OffscreenCanvas === "undefined" && typeof document === "undefined") throw new Error("Secure image redaction requires a browser canvas.");
+    const canvas = typeof OffscreenCanvas !== "undefined"
+      ? new OffscreenCanvas(bitmap.width, bitmap.height)
+      : document.createElement("canvas");
+    canvas.width = bitmap.width; canvas.height = bitmap.height;
+    // Preserve the source alpha channel. Forcing an opaque canvas without first painting a
+    // background turns every transparent pixel black, not just the selected redaction boxes.
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Secure image redaction canvas is unavailable.");
+    context.drawImage(bitmap, 0, 0);
+    context.fillStyle = "#000000";
+    for (const region of removals) {
+      context.fillRect(
+        Math.max(0, region.x) * bitmap.width,
+        Math.max(0, region.y) * bitmap.height,
+        Math.min(1 - region.x, region.width) * bitmap.width,
+        Math.min(1 - region.y, region.height) * bitmap.height,
+      );
+    }
+    const flattened = "convertToBlob" in canvas
+      ? await canvas.convertToBlob({ type: "image/png" })
+      : await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob: Blob | null) => blob ? resolve(blob) : reject(new Error("The redacted image could not be flattened.")), "image/png"));
+    return { bytes: await flattened.arrayBuffer(), width: bitmap.width, height: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
+}
+
 export interface RasterizedPage { bytes: ArrayBuffer; width: number; height: number }
 export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[]) => Promise<RasterizedPage>;
 
@@ -168,6 +270,8 @@ export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, f
 };
 
 export async function buildEvidencePack(project: TracepackProject, files: Map<string, Blob>, rasterizer: PdfRasterizer = rasterizeRedactedPage) {
+  const unresolvedManual = project.evidence.filter((item) => item.reviewStatus !== "excluded").flatMap((item) => item.manualRedactions ?? []).filter((region) => region.decision === "unreviewed");
+  if (unresolvedManual.length > 0) throw new Error(`Review ${unresolvedManual.length} manual image redaction${unresolvedManual.length === 1 ? "" : "s"} before export.`);
   const output = await PDFDocument.create(); const regular = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
   const included = project.evidence.filter((item) => item.reviewStatus !== "excluded");
   const cover = output.addPage([595, 842]);
@@ -193,11 +297,17 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
         for (const pageIndex of source.getPageIndices()) {
           const pageNumber = pageIndex + 1;
           const pageFindings = removals.filter((finding) => finding.location?.pageNumber === pageNumber);
-          if (pageFindings.length === 0) { const [page] = await output.copyPages(source, [pageIndex]); output.addPage(page); continue; }
+          if (pageFindings.length === 0) {
+            const [page] = await output.copyPages(source, [pageIndex]);
+            if (!page) throw new Error(`PDF page ${pageNumber} could not be copied.`);
+            reserveImportedPageFooter(page);
+            output.addPage(page);
+            continue;
+          }
           const flattened = await rasterizer(blob, pageNumber, pageFindings);
           const image = await output.embedJpg(flattened.bytes);
-          const page = output.addPage([flattened.width, flattened.height]);
-          page.drawImage(image, { x: 0, y: 0, width: flattened.width, height: flattened.height });
+          const page = output.addPage([flattened.width, flattened.height + 46]);
+          page.drawImage(image, { x: 0, y: 46, width: flattened.width, height: flattened.height });
         }
       } catch (cause) {
         const notice = output.addPage([595, 842]);
@@ -209,7 +319,25 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
         }
       }
     }
-    else if (item.sourceType === "image" || item.sourceType === "webpage") { const isWebp = item.mimeType === "image/webp"; const bytes = isWebp ? await convertWebpToPng(blob) : await blob.arrayBuffer(); const image = item.mimeType === "image/png" || isWebp ? await output.embedPng(bytes) : await output.embedJpg(bytes); const page = output.addPage([595, 842]); const scaled = image.scaleToFit(487, 700); page.drawText(redactedTitle(item).slice(0, 74), { x: 54, y: 790, size: 12, font: bold }); page.drawImage(image, { x: (595 - scaled.width) / 2, y: 60 + (700 - scaled.height) / 2, width: scaled.width, height: scaled.height }); }
+    else if (item.sourceType === "image" || item.sourceType === "webpage") {
+      const regions = item.manualRedactions ?? [];
+      const flattened = regions.some((region) => region.decision === "remove")
+        ? await flattenImageRedactions(blob, regions)
+        : undefined;
+      const isWebp = item.mimeType === "image/webp";
+      const bytes = flattened?.bytes ?? (isWebp ? await convertWebpToPng(blob) : await blob.arrayBuffer());
+      const image = flattened || item.mimeType === "image/png" || isWebp ? await output.embedPng(bytes) : await output.embedJpg(bytes);
+      const page = output.addPage([595, 842]);
+      page.drawRectangle({ x: 36, y: 38, width: 523, height: 766, color: rgb(1, 0.996, 0.976), borderColor: rgb(0.85, 0.87, 0.84), borderWidth: 1 });
+      page.drawText(redactedTitle(item).slice(0, 68), { x: 54, y: 770, size: 14, font: bold, color: rgb(0.09, 0.14, 0.11) });
+      const category = project.template.categories.find((entry) => entry.id === item.categoryId)?.name ?? "Other";
+      page.drawText(category.toUpperCase(), { x: 54, y: 749, size: 8, font: bold, color: rgb(0.12, 0.35, 0.25) });
+      const scaled = image.scaleToFit(487, 640);
+      const imageX = (595 - scaled.width) / 2; const imageY = 82 + (640 - scaled.height) / 2;
+      page.drawRectangle({ x: imageX - 5, y: imageY - 5, width: scaled.width + 10, height: scaled.height + 10, color: rgb(0.96, 0.96, 0.93) });
+      page.drawImage(image, { x: imageX, y: imageY, width: scaled.width, height: scaled.height });
+      if (regions.some((region) => region.decision === "remove")) page.drawText("Manual redactions flattened into this export copy", { x: 54, y: 58, size: 8, font: regular, color: rgb(0.4, 0.44, 0.42) });
+    }
     else if (item.sourceType === "note") {
       const text = redactedBody(item, await blob.text());
       let notePage = output.addPage([595, 842]);
@@ -237,6 +365,13 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
     }
     drawObservationsPage(output, item, regular, bold);
   }
+  const pages = output.getPages();
+  pages.forEach((page, index) => {
+    if (index === 0) return;
+    page.drawLine({ start: { x: 54, y: 34 }, end: { x: 541, y: 34 }, thickness: 0.5, color: rgb(0.82, 0.84, 0.81) });
+    page.drawText(project.title.slice(0, 48), { x: 54, y: 20, size: 7.5, font: regular, color: rgb(0.42, 0.46, 0.43) });
+    page.drawText(`Page ${index + 1} of ${pages.length}`, { x: 475, y: 20, size: 7.5, font: regular, color: rgb(0.42, 0.46, 0.43) });
+  });
   const bytes = await output.save();
   return new Blob([bytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
 }
