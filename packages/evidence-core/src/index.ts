@@ -96,6 +96,10 @@ export interface EvidenceItem {
   extractedText?: string;
   textExtractionStatus?: "pending" | "complete" | "no_text_layer" | "failed";
   privacyFindings?: PrivacyFinding[];
+  // User-drawn image regions are stored separately from automatic privacy findings.
+  // Coordinates are normalised to the original image dimensions so preview and export use
+  // the same immutable instruction without modifying the source evidence.
+  manualRedactions?: ManualImageRedaction[];
   // Set only when this item was created by an external producer via the evidence
   // interchange format (packages/evidence-interchange), never by Tracepack's own file
   // import or capture paths. Its presence is what lets export/render code tell "Tracepack
@@ -139,6 +143,17 @@ export type PrivacyDecision = "unreviewed" | "keep" | "remove";
 // image, it is removed by text substitution wherever that field is rendered (see
 // document-engine.redactText and export-engine's use of it).
 export type PrivacyFindingField = "title" | "filename" | "body";
+
+export interface ManualImageRedaction {
+  id: string;
+  kind: "image-region";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  decision: PrivacyDecision;
+  createdAt: string;
+}
 
 export interface PrivacyFinding {
   id: string;

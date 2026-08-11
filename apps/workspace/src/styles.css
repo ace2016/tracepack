@@ -294,6 +294,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .finding-card { flex-direction: column; align-items: stretch; }
   .timeline article { grid-template-columns: 1fr; }
 }
+
+/* ---------- Manual image redaction ---------- */
+.redaction-editor { display: grid; gap: 10px; }
+.redaction-help { margin: 0 !important; padding: 10px 12px; border: 1px solid var(--warning-line); border-radius: 8px; background: var(--warning-bg); color: var(--warning-ink) !important; }
+.redaction-frame { position: relative; width: fit-content; max-width: 100%; margin: auto; line-height: 0; cursor: crosshair; touch-action: none; user-select: none; }
+.redaction-frame img { display: block; max-width: 100%; height: auto; margin: 0; pointer-events: none; }
+.redaction-region { position: absolute; box-sizing: border-box; border: 2px solid #9b241c; background: rgba(155, 36, 28, .32); pointer-events: none; }
+.redaction-region.remove { background: rgba(0, 0, 0, .86); border-color: #000; }
+.redaction-region.keep { background: rgba(29, 60, 45, .12); border-color: var(--accent-dark); }
+.redaction-toolbar { display: flex; align-items: center; gap: 14px; justify-content: flex-end; font-size: 12px; color: var(--muted); }
+.redaction-toolbar .btn-quiet:disabled { opacity: .45; cursor: not-allowed; }
+.manual-finding { border-left: 4px solid var(--warning-line); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
   .node-doc, .thread, .mark-wrap, .stage-line, .stage-stop { animation: none !important; opacity: 1 !important; transform: none !important; stroke-dashoffset: 0 !important; }
