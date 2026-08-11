@@ -1,0 +1,478 @@
+diff --git a/packages/export-engine/src/index.ts b/packages/export-engine/src/index.ts
+index 2fb1723..3a72320 100644
+--- a/packages/export-engine/src/index.ts
++++ b/packages/export-engine/src/index.ts
+@@ -2,73 +2,188 @@ import { redactText } from "@tracepack/document-engine";
+ import type { EvidenceItem, ManualImageRedaction, PrivacyFinding, TracepackProject } from "@tracepack/evidence-core";
+ import { sha256Hex } from "@tracepack/evidence-sdk";
+ import { strToU8, zipSync } from "fflate";
+-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, StandardFonts, rgb, type PDFFont, type PDFPage, type Color } from "pdf-lib";
++import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFStream, StandardFonts, degrees, rgb, type PDFFont, type PDFPage, type Color } from "pdf-lib";
+ 
+ const IMPORTED_PAGE_FOOTER_HEIGHT = 46;
+ 
+-function shiftCoordinatePairs(array: PDFArray | undefined, deltaY: number) {
++// The four normalized page-rotation cases (ISO 32000's /Rotate is always a multiple of 90,
++// clockwise). A page's own reported rotation can technically be any integer -- normalizeAngle
++// folds it into this set the same way viewers do.
++type PageAngle = 0 | 90 | 180 | 270;
++function normalizeAngle(angle: number): PageAngle {
++  const wrapped = ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
++  return wrapped as PageAngle;
++}
++
++// Maps a point (u, v) in the source page's CROP-BOX-relative, unrotated coordinate space
++// (u in [0, cropWidth], v in [0, cropHeight], exactly the local space pdf-lib's embedPage
++// produces) to its position on the new footer-bearing page, for a source page whose /Rotate
++// is `angle` degrees clockwise. Derived once analytically per case (not guessed): each case
++// solves "where do the crop box's four corners land after the same clockwise rotation the
++// original page's own /Rotate already told every viewer to apply", so the copy displays
++// identically to the source, just with footerHeight of new, guaranteed-blank space added on
++// what is the visual bottom edge in every case.
++function transformPoint(u: number, v: number, angle: PageAngle, cropWidth: number, cropHeight: number, footerHeight: number): [number, number] {
++  switch (angle) {
++    case 0: return [u, v + footerHeight];
++    case 90: return [v, cropWidth + footerHeight - u];
++    case 180: return [cropWidth - u, footerHeight + cropHeight - v];
++    case 270: return [cropHeight - v, footerHeight + u];
++  }
++}
++
++// The drawPage() placement (anchor + rotate) that reproduces the same corner mapping as
++// transformPoint above, so the visible content and the annotation geometry (transformed
++// separately below, since embedPage never carries annotations) end up in agreement.
++function footerPagePlacement(angle: PageAngle, cropWidth: number, cropHeight: number, footerHeight: number) {
++  switch (angle) {
++    case 0: return { x: 0, y: footerHeight, rotate: degrees(0), pageWidth: cropWidth, pageHeight: cropHeight + footerHeight };
++    case 90: return { x: 0, y: cropWidth + footerHeight, rotate: degrees(270), pageWidth: cropHeight, pageHeight: cropWidth + footerHeight };
++    case 180: return { x: cropWidth, y: footerHeight + cropHeight, rotate: degrees(180), pageWidth: cropWidth, pageHeight: cropHeight + footerHeight };
++    case 270: return { x: cropHeight, y: footerHeight, rotate: degrees(90), pageWidth: cropHeight, pageHeight: cropWidth + footerHeight };
++  }
++}
++
++function transformCoordinatePairs(array: PDFArray | undefined, cropX: number, cropY: number, angle: PageAngle, cropWidth: number, cropHeight: number, footerHeight: number, reorderAsRect = false) {
+   if (!array) return;
+-  for (let index = 1; index < array.size(); index += 2) {
+-    const value = array.lookup(index, PDFNumber);
+-    if (value) array.set(index, PDFNumber.of(value.asNumber() + deltaY));
++  const points: [number, number][] = [];
++  for (let index = 0; index + 1 < array.size(); index += 2) {
++    const x = array.lookup(index, PDFNumber);
++    const y = array.lookup(index + 1, PDFNumber);
++    if (!x || !y) { points.push([NaN, NaN]); continue; }
++    points.push(transformPoint(x.asNumber() - cropX, y.asNumber() - cropY, angle, cropWidth, cropHeight, footerHeight));
+   }
++  // /Rect specifically must stay in [llx, lly, urx, ury] order (lower-left, upper-right) for
++  // viewers to treat it as a valid box -- a rotation can swap which transformed corner ends up
++  // lower/upper, left/right, so re-sort into that canonical order. /L, /Vertices, /CL and
++  // /InkList are point *paths*, not boxes; their point order carries meaning and must not be
++  // reordered, only transformed in place.
++  const ordered = reorderAsRect && points.length === 2
++    ? [[Math.min(points[0]![0], points[1]![0]), Math.min(points[0]![1], points[1]![1])], [Math.max(points[0]![0], points[1]![0]), Math.max(points[0]![1], points[1]![1])]]
++    : points;
++  ordered.forEach(([x, y], pointIndex) => {
++    array.set(pointIndex * 2, PDFNumber.of(x!));
++    array.set(pointIndex * 2 + 1, PDFNumber.of(y!));
++  });
+ }
+ 
+ // /InkList is an array of arrays (one stroke per sub-array), each holding its own x y x y ...
+-// coordinate pairs, so it needs one level of unwrapping before shiftCoordinatePairs applies.
+-function shiftInkList(array: PDFArray | undefined, deltaY: number) {
++// coordinate pairs, so it needs one level of unwrapping before transformCoordinatePairs applies.
++function transformInkList(array: PDFArray | undefined, cropX: number, cropY: number, angle: PageAngle, cropWidth: number, cropHeight: number, footerHeight: number) {
+   if (!array) return;
+   for (let index = 0; index < array.size(); index += 1) {
+-    shiftCoordinatePairs(array.lookup(index, PDFArray), deltaY);
++    transformCoordinatePairs(array.lookup(index, PDFArray), cropX, cropY, angle, cropWidth, cropHeight, footerHeight);
+   }
+ }
+ 
++// A pure-rotation PDF content matrix [a b c d e f] for the same clockwise `angle` used
++// elsewhere in this file, in row-vector form (x' = a*x + c*y, y' = b*x + d*y). No-op for 0.
++const ROTATION_MATRIX: Record<PageAngle, [number, number, number, number, number, number]> = {
++  0: [1, 0, 0, 1, 0, 0],
++  90: [0, -1, 1, 0, 0, 0],
++  180: [-1, 0, 0, -1, 0, 0],
++  270: [0, 1, -1, 0, 0, 0],
++};
++
++function composeMatrix(m1: readonly number[], m2: readonly number[]): [number, number, number, number, number, number] {
++  const [a1, b1, c1, d1, e1, f1] = m1;
++  const [a2, b2, c2, d2] = m2;
++  return [a1! * a2! + b1! * c2!, a1! * b2! + b1! * d2!, c1! * a2! + d1! * c2!, c1! * b2! + d1! * d2!, e1! * a2! + f1! * c2!, e1! * b2! + f1! * d2!];
++}
++
++// A rotated page's content is placed via drawPage's own rotate option, but an annotation's
++// cached /AP normal appearance stream is a self-contained Form XObject the viewer maps into
++// /Rect using ITS OWN Matrix (PDF 32000-1 §12.5.5) -- transformCoordinatePairs moving /Rect
++// alone never touches that. Left untouched, a 90/270 rotation swaps the transformed Rect's
++// width/height while the appearance's own transformed bounding box keeps its original aspect
++// ratio, so the viewer's box-to-Rect fit stretches it non-uniformly; at 180 the content simply
++// renders in its original (now upside-down relative to the page) orientation. Composing the
++// same rotation into the appearance's own Matrix keeps its transformed bounding box in step
++// with the rotated Rect, so the fit stays undistorted and correctly oriented.
++function rotateAnnotationAppearance(annotation: PDFDict, angle: PageAngle) {
++  if (angle === 0) return;
++  const apDict = annotation.lookupMaybe(PDFName.of("AP"), PDFDict);
++  const normal = apDict?.lookupMaybe(PDFName.of("N"), PDFStream);
++  // A stateful annotation (checkbox, radio button) has /AP /N pointing at a sub-dictionary of
++  // named appearance streams instead of a single stream -- rare on evidence PDFs and left
++  // untouched rather than guessed at.
++  if (!normal) return;
++  const existing = normal.dict.lookupMaybe(PDFName.of("Matrix"), PDFArray);
++  const existingValues = existing ? Array.from({ length: 6 }, (_, index) => existing.lookup(index, PDFNumber)?.asNumber() ?? [1, 0, 0, 1, 0, 0][index]!) : [1, 0, 0, 1, 0, 0];
++  const composed = composeMatrix(existingValues, ROTATION_MATRIX[angle]);
++  normal.dict.set(PDFName.of("Matrix"), normal.dict.context.obj(composed));
++}
++
+ /**
+- * Adds room below an imported PDF page without separating annotations from their content.
+- * PDFPage.translateContent only moves the content stream, so annotation geometry must be moved
+- * by the same amount: /Rect and /QuadPoints on every annotation, plus /L (line), /Vertices
+- * (polygon/polyline), /CL (free-text callout) and /InkList (ink) for annotations that have no
+- * cached appearance stream and are re-rendered by the viewer from these raw coordinates. Every
+- * visible page box is extended upward by footerHeight, keeping its own original lower edge
+- * (never reset to the MediaBox's), so a page whose CropBox was deliberately set narrower than
+- * its MediaBox to hide content below the crop keeps that content hidden after the shift.
++ * Copies one page of an imported PDF onto `output` with room for a footer, WITHOUT ever
++ * risking exposure of content the source PDF cropped out of view. The earlier approach grew
++ * the copied page's own boxes and translated its content stream in place; because a page's
++ * CropBox can legitimately sit inside its MediaBox (exactly how a producer hides content
++ * without deleting it), that in-place growth could pull up to footerHeight of that
++ * deliberately-hidden strip back into the visible window -- confirmed by working through the
++ * geometry: growing CropBox height while holding its lower edge fixed, combined with shifting
++ * content up by the same amount, exposes precisely the band between (crop.y - footerHeight)
++ * and crop.y that was previously below the visible window.
++ *
++ * This version never modifies the source page's own coordinate space at all. It embeds the
++ * page as a Form XObject clipped to exactly its CropBox (pdf-lib's embedPage — a PDF Form
++ * XObject's /BBox is a hard clip every conforming renderer must honor, so nothing outside the
++ * crop is ever visible), then draws that clipped embed onto a brand-new page whose entire
++ * coordinate space never had any content in it before -- the footer strip is guaranteed-blank
++ * space, not reclaimed space. Annotations aren't carried by embedPage (it only captures the
++ * content stream), so they're copied and transformed separately via transformCoordinatePairs,
++ * using the exact same corner mapping the visible content itself was placed with.
+  */
+-function reserveImportedPageFooter(page: PDFPage, footerHeight = IMPORTED_PAGE_FOOTER_HEIGHT) {
+-  const media = page.getMediaBox();
+-  const crop = page.getCropBox();
+-  const bleed = page.getBleedBox();
+-  const trim = page.getTrimBox();
+-  const art = page.getArtBox();
+-
+-  page.setMediaBox(media.x, media.y, media.width, media.height + footerHeight);
+-  const extendBox = (box: { x: number; y: number; width: number; height: number }) => ({
+-    x: box.x,
+-    y: box.y,
+-    width: box.width,
+-    height: box.height + footerHeight,
+-  });
+-  const nextCrop = extendBox(crop); page.setCropBox(nextCrop.x, nextCrop.y, nextCrop.width, nextCrop.height);
+-  const nextBleed = extendBox(bleed); page.setBleedBox(nextBleed.x, nextBleed.y, nextBleed.width, nextBleed.height);
+-  const nextTrim = extendBox(trim); page.setTrimBox(nextTrim.x, nextTrim.y, nextTrim.width, nextTrim.height);
+-  const nextArt = extendBox(art); page.setArtBox(nextArt.x, nextArt.y, nextArt.width, nextArt.height);
+-
+-  page.translateContent(0, footerHeight);
+-  const annotations = page.node.Annots();
+-  if (!annotations) return;
+-  for (let index = 0; index < annotations.size(); index += 1) {
+-    const annotation = annotations.lookup(index, PDFDict);
+-    if (!annotation) continue;
+-    // lookupMaybe, not lookup: these keys are optional on any given annotation subtype (a Link
+-    // has no /L, a Line has no /Rect on some producers' output), and the typed lookup() throws
+-    // rather than returning undefined when a key is simply absent. lookupMaybe is the variant
+-    // that tolerates that.
+-    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("Rect"), PDFArray), footerHeight);
+-    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("QuadPoints"), PDFArray), footerHeight);
+-    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("L"), PDFArray), footerHeight);
+-    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("Vertices"), PDFArray), footerHeight);
+-    shiftCoordinatePairs(annotation.lookupMaybe(PDFName.of("CL"), PDFArray), footerHeight);
+-    shiftInkList(annotation.lookupMaybe(PDFName.of("InkList"), PDFArray), footerHeight);
++async function copyImportedPageWithFooter(output: PDFDocument, source: PDFDocument, pageIndex: number, footerHeight = IMPORTED_PAGE_FOOTER_HEIGHT): Promise<PDFPage> {
++  const [sourcePage] = await output.copyPages(source, [pageIndex]);
++  if (!sourcePage) throw new Error(`PDF page ${pageIndex + 1} could not be copied.`);
++  // embedPage requires a /Contents entry to exist; a page with literally nothing drawn on it
++  // (a blank divider page, or a bare synthetic PDFDocument.addPage() with no draw calls) has
++  // none. Forcing an empty content stream is a true no-op -- it adds zero operators -- and
++  // keeps a genuinely blank source page exportable instead of falling into the "could not be
++  // included" notice path.
++  sourcePage.pushOperators();
++  const crop = sourcePage.getCropBox();
++  const angle = normalizeAngle(sourcePage.getRotation().angle);
++  const embedded = await output.embedPage(sourcePage, { left: crop.x, bottom: crop.y, right: crop.x + crop.width, top: crop.y + crop.height });
++  const placement = footerPagePlacement(angle, crop.width, crop.height, footerHeight);
++  const page = output.addPage([placement.pageWidth, placement.pageHeight]);
++  page.drawPage(embedded, { x: placement.x, y: placement.y, width: crop.width, height: crop.height, rotate: placement.rotate });
++
++  // /UserUnit scales MediaBox/CropBox units into physical measurements (used for large-format
++  // sources like architectural scans); a fresh addPage() always defaults to 1. Propagating the
++  // source's value keeps the new page's physical size correct -- since none of the box numbers
++  // above are rescaled, only repositioned/rotated, copying it verbatim is sufficient.
++  const userUnit = sourcePage.node.lookupMaybe(PDFName.of("UserUnit"), PDFNumber);
++  if (userUnit) page.node.set(PDFName.of("UserUnit"), userUnit);
++  // A page-level /Group (an isolated/knockout transparency group) affects how semi-transparent
++  // content composites; propagate it to the replacement page so that compositing doesn't
++  // silently change even though it isn't fully equivalent to a group scoped to just the
++  // embedded content -- pdf-lib's embedPage doesn't expose a hook to add /Group to the Form
++  // XObject it creates directly.
++  const group = sourcePage.node.get(PDFName.of("Group"));
++  if (group) page.node.set(PDFName.of("Group"), group);
++
++  const annotations = sourcePage.node.Annots();
++  if (annotations) {
++    for (let index = 0; index < annotations.size(); index += 1) {
++      const annotation = annotations.lookup(index, PDFDict);
++      if (!annotation) continue;
++      // lookupMaybe, not lookup: these keys are optional on any given annotation subtype (a
++      // Link has no /L, a Line has no /Rect on some producers' output), and the typed lookup()
++      // throws rather than returning undefined when a key is simply absent. lookupMaybe is the
++      // variant that tolerates that.
++      transformCoordinatePairs(annotation.lookupMaybe(PDFName.of("Rect"), PDFArray), crop.x, crop.y, angle, crop.width, crop.height, footerHeight, true);
++      transformCoordinatePairs(annotation.lookupMaybe(PDFName.of("QuadPoints"), PDFArray), crop.x, crop.y, angle, crop.width, crop.height, footerHeight);
++      transformCoordinatePairs(annotation.lookupMaybe(PDFName.of("L"), PDFArray), crop.x, crop.y, angle, crop.width, crop.height, footerHeight);
++      transformCoordinatePairs(annotation.lookupMaybe(PDFName.of("Vertices"), PDFArray), crop.x, crop.y, angle, crop.width, crop.height, footerHeight);
++      transformCoordinatePairs(annotation.lookupMaybe(PDFName.of("CL"), PDFArray), crop.x, crop.y, angle, crop.width, crop.height, footerHeight);
++      transformInkList(annotation.lookupMaybe(PDFName.of("InkList"), PDFArray), crop.x, crop.y, angle, crop.width, crop.height, footerHeight);
++      rotateAnnotationAppearance(annotation, angle);
++    }
++    page.node.set(PDFName.of("Annots"), annotations);
+   }
++  return page;
+ }
+ 
+ // A title/filename PII finding marked "remove" is never flattened into a page image (there
+@@ -298,10 +413,7 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
+           const pageNumber = pageIndex + 1;
+           const pageFindings = removals.filter((finding) => finding.location?.pageNumber === pageNumber);
+           if (pageFindings.length === 0) {
+-            const [page] = await output.copyPages(source, [pageIndex]);
+-            if (!page) throw new Error(`PDF page ${pageNumber} could not be copied.`);
+-            reserveImportedPageFooter(page);
+-            output.addPage(page);
++            await copyImportedPageWithFooter(output, source, pageIndex);
+             continue;
+           }
+           const flattened = await rasterizer(blob, pageNumber, pageFindings);
+@@ -368,9 +480,22 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
+   const pages = output.getPages();
+   pages.forEach((page, index) => {
+     if (index === 0) return;
+-    page.drawLine({ start: { x: 54, y: 34 }, end: { x: 541, y: 34 }, thickness: 0.5, color: rgb(0.82, 0.84, 0.81) });
+-    page.drawText(project.title.slice(0, 48), { x: 54, y: 20, size: 7.5, font: regular, color: rgb(0.42, 0.46, 0.43) });
+-    page.drawText(`Page ${index + 1} of ${pages.length}`, { x: 475, y: 20, size: 7.5, font: regular, color: rgb(0.42, 0.46, 0.43) });
++    // Positioned from each page's own width, not a hardcoded 595pt assumption -- an imported
++    // PDF page can be any size (a scanned receipt, a landscape document), and a fixed x=541/475
++    // right margin would land outside a narrower page's visible area entirely.
++    const width = page.getWidth();
++    const margin = Math.min(54, width / 8);
++    page.drawLine({ start: { x: margin, y: 34 }, end: { x: width - margin, y: 34 }, thickness: 0.5, color: rgb(0.82, 0.84, 0.81) });
++    const label = `Page ${index + 1} of ${pages.length}`;
++    const labelWidth = regular.widthOfTextAtSize(label, 7.5);
++    // Truncated to the space actually left after the right-aligned page-number label, not a
++    // flat 48-character guess -- a receipt-width page leaves far less room than a 595pt one,
++    // and a long title would otherwise run straight through the page number.
++    const titleBudget = Math.max(0, width - margin * 2 - labelWidth - 12);
++    let title = project.title;
++    while (title.length > 0 && regular.widthOfTextAtSize(title, 7.5) > titleBudget) title = title.slice(0, -1);
++    page.drawText(title, { x: margin, y: 20, size: 7.5, font: regular, color: rgb(0.42, 0.46, 0.43) });
++    page.drawText(label, { x: width - margin - labelWidth, y: 20, size: 7.5, font: regular, color: rgb(0.42, 0.46, 0.43) });
+   });
+   const bytes = await output.save();
+   return new Blob([bytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
+diff --git a/packages/export-engine/src/manual-image-redaction.test.ts b/packages/export-engine/src/manual-image-redaction.test.ts
+index 559b0a9..064e723 100644
+--- a/packages/export-engine/src/manual-image-redaction.test.ts
++++ b/packages/export-engine/src/manual-image-redaction.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, expect, it } from "vitest";
+ import type { TracepackProject } from "@tracepack/evidence-core";
+-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber } from "pdf-lib";
++import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFStream, degrees } from "pdf-lib";
+ import { buildEvidencePack } from "./index";
+ 
+ function projectWithManualDecision(decision: "unreviewed" | "keep" | "remove"): TracepackProject {
+@@ -64,7 +64,7 @@ describe("manual image redaction export gate", () => {
+     expect(evidencePage.getHeight()).toBe(446);
+   });
+ 
+-  it("preserves a custom crop box and moves annotations with imported content", async () => {
++  it("preserves a custom crop box's content and moves annotations into the new page's coordinate space", async () => {
+     const source = await PDFDocument.create();
+     const page = source.addPage([300, 400]);
+     page.setCropBox(10, 20, 280, 360);
+@@ -85,25 +85,39 @@ describe("manual image redaction export gate", () => {
+     const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]));
+     const exported = await PDFDocument.load(await result.arrayBuffer());
+     const evidencePage = exported.getPage(2);
+-    // The crop's own lower edge (y: 20) must be preserved, not reset to the MediaBox's (y: 0) --
+-    // only the height grows, by exactly the footer strip.
+-    expect(evidencePage.getCropBox()).toEqual({ x: 10, y: 20, width: 280, height: 406 });
++    // The new page is always a clean, freshly-created page sized to exactly the source crop
++    // box plus the footer strip -- it never reuses or offsets by the source's own box origin,
++    // since (unlike the old in-place-growth approach) nothing about the source page's
++    // coordinate space is reused here at all.
++    expect(evidencePage.getWidth()).toBe(280);
++    expect(evidencePage.getHeight()).toBe(406);
++    expect(evidencePage.getCropBox()).toEqual({ x: 0, y: 0, width: 280, height: 406 });
+ 
++    // Annotation coordinates are translated from the source's absolute space into the new
++    // page's space: subtract the crop origin (10, 20), then add the footer offset (46).
+     const annotations = evidencePage.node.Annots();
+     const copiedAnnotation = annotations?.lookup(0, PDFDict);
+     const rect = copiedAnnotation?.lookup(PDFName.of("Rect"), PDFArray);
+     const quadPoints = copiedAnnotation?.lookup(PDFName.of("QuadPoints"), PDFArray);
+-    expect(Array.from({ length: rect?.size() ?? 0 }, (_, index) => rect?.lookup(index, PDFNumber)?.asNumber())).toEqual([30, 86, 130, 106]);
+-    expect(Array.from({ length: quadPoints?.size() ?? 0 }, (_, index) => quadPoints?.lookup(index, PDFNumber)?.asNumber())).toEqual([30, 106, 130, 106, 30, 86, 130, 86]);
++    expect(Array.from({ length: rect?.size() ?? 0 }, (_, index) => rect?.lookup(index, PDFNumber)?.asNumber())).toEqual([20, 66, 120, 86]);
++    expect(Array.from({ length: quadPoints?.size() ?? 0 }, (_, index) => quadPoints?.lookup(index, PDFNumber)?.asNumber())).toEqual([20, 86, 120, 86, 20, 66, 120, 66]);
+   });
+ 
+-  it("does not expose content the source PDF hid below its crop box", async () => {
++  it("clips the embedded page to exactly the source CropBox, never the full MediaBox", async () => {
+     // A CropBox bottom above the MediaBox's is exactly how a producer visually hides content
+-    // without deleting it. Extending the crop down to the MediaBox's bottom, instead of only
+-    // growing it upward, would pull that hidden strip back into the visible window.
++    // without deleting it. The earlier in-place approach grew the copied page's own CropBox
++    // while translating its content, which (worked through the geometry) pulled up to
++    // footerHeight of that hidden strip back into the visible window. This version never
++    // touches the source page's coordinate space -- it embeds the page as a Form XObject
++    // whose /BBox is set to exactly the source CropBox, a hard clip every conforming PDF
++    // renderer must honor, then draws that clipped embed onto a brand-new, always-blank page.
++    // This test asserts the actual safety contract directly: the embedded XObject's /BBox in
++    // the saved bytes must match the source CropBox precisely, not the full MediaBox -- if a
++    // future change embedded the whole page instead of just the crop, this catches it.
+     const source = await PDFDocument.create();
+     const page = source.addPage([300, 400]);
+     page.setCropBox(0, 50, 300, 350);
++    page.drawText("visible", { x: 10, y: 60 });
+     const sourceBytes = await source.save();
+     const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
+     const project = projectWithManualDecision("keep");
+@@ -112,9 +126,123 @@ describe("manual image redaction export gate", () => {
+     const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]));
+     const exported = await PDFDocument.load(await result.arrayBuffer());
+     const evidencePage = exported.getPage(2);
+-    const crop = evidencePage.getCropBox();
+-    expect(crop.y).toBe(50);
+-    expect(crop.height).toBe(396);
++    expect(evidencePage.getWidth()).toBe(300);
++    expect(evidencePage.getHeight()).toBe(396);
++
++    const xObjects = evidencePage.node.Resources()?.lookupMaybe(PDFName.of("XObject"), PDFDict);
++    const forms = (xObjects?.keys() ?? []).map((key) => xObjects!.lookup(key, PDFStream)).filter((value): value is PDFStream => value instanceof PDFStream);
++    expect(forms).toHaveLength(1);
++    const bbox = forms[0]!.dict.lookup(PDFName.of("BBox"), PDFArray);
++    expect(Array.from({ length: bbox.size() }, (_, index) => bbox.lookup(index, PDFNumber).asNumber())).toEqual([0, 50, 300, 400]);
++  });
++
++  it("reproduces a rotated imported page upright, with the footer on its visual bottom edge", async () => {
++    const source = await PDFDocument.create();
++    const page = source.addPage([300, 400]);
++    page.setRotation(degrees(90));
++    page.drawText("rotated", { x: 10, y: 10 });
++    const sourceBytes = await source.save();
++    const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
++    const project = projectWithManualDecision("keep");
++    project.evidence[0] = { ...project.evidence[0]!, sourceType: "pdf", mimeType: "application/pdf", manualRedactions: [] };
++
++    const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]));
++    const exported = await PDFDocument.load(await result.arrayBuffer());
++    const evidencePage = exported.getPage(2);
++    // A source page that displays as 400 wide x 300 tall once its own /Rotate is applied
++    // (portrait 300x400, rotated 90) must produce a new page sized to match that visual
++    // orientation, not the raw unrotated 300x400 -- otherwise the footer ends up reserved
++    // along the wrong (visual) edge, exactly Codex's "displaced sideways" finding.
++    expect(evidencePage.getWidth()).toBe(400);
++    expect(evidencePage.getHeight()).toBe(346);
++    expect(evidencePage.getRotation().angle).toBe(0);
++  });
++
++  it("preserves /UserUnit and a page-level /Group on the replacement page", async () => {
++    const source = await PDFDocument.create();
++    const page = source.addPage([300, 400]);
++    page.node.set(PDFName.of("UserUnit"), PDFNumber.of(2));
++    page.node.set(PDFName.of("Group"), source.context.obj({ Type: "Group", S: "Transparency", CS: "DeviceRGB", I: true }));
++    const sourceBytes = await source.save();
++    const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
++    const project = projectWithManualDecision("keep");
++    project.evidence[0] = { ...project.evidence[0]!, sourceType: "pdf", mimeType: "application/pdf", manualRedactions: [] };
++
++    const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]));
++    const exported = await PDFDocument.load(await result.arrayBuffer());
++    const evidencePage = exported.getPage(2);
++    expect(evidencePage.node.lookupMaybe(PDFName.of("UserUnit"), PDFNumber)?.asNumber()).toBe(2);
++    const group = evidencePage.node.lookupMaybe(PDFName.of("Group"), PDFDict);
++    expect(group?.lookup(PDFName.of("S"))?.toString()).toBe("/Transparency");
++    expect(group?.lookup(PDFName.of("I"))?.toString()).toBe("true");
++  });
++
++  it("keeps a rotated annotation's cached appearance undistorted by composing the same rotation into its Matrix", async () => {
++    const source = await PDFDocument.create();
++    const page = source.addPage([300, 400]);
++    page.setRotation(degrees(90));
++    // BBox and Rect share the same 40x20 aspect ratio before rotation -- an unmodified 1:1 fit.
++    const appearance = source.context.flateStream("", { Type: "XObject", Subtype: "Form", FormType: 1, BBox: [0, 0, 40, 20] });
++    const appearanceRef = source.context.register(appearance);
++    const annotation = source.context.obj({ Type: "Annot", Subtype: "Stamp", Rect: [10, 10, 50, 30], AP: { N: appearanceRef }, Border: [0, 0, 0] });
++    const annotationRef = source.context.register(annotation);
++    page.node.set(PDFName.of("Annots"), source.context.obj([annotationRef]));
++    const sourceBytes = await source.save();
++    const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
++    const project = projectWithManualDecision("keep");
++    project.evidence[0] = { ...project.evidence[0]!, sourceType: "pdf", mimeType: "application/pdf", manualRedactions: [] };
++
++    const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]));
++    const exported = await PDFDocument.load(await result.arrayBuffer());
++    const evidencePage = exported.getPage(2);
++    const copiedAnnotation = evidencePage.node.Annots()?.lookup(0, PDFDict);
++    const rect = copiedAnnotation?.lookup(PDFName.of("Rect"), PDFArray);
++    const rectValues = Array.from({ length: 4 }, (_, index) => rect!.lookup(index, PDFNumber).asNumber());
++    const rectWidth = rectValues[2]! - rectValues[0]!;
++    const rectHeight = rectValues[3]! - rectValues[1]!;
++    // 90 degrees swaps the transformed Rect's own width/height (40x20 -> 20x40) -- that alone
++    // is expected and matches every other geometry transform in this file.
++    expect([rectWidth, rectHeight]).toEqual([20, 40]);
++
++    // The real question: does the appearance's OWN transformed bounding box now match that
++    // same 20x40 shape, so the viewer's BBox-to-Rect fit (PDF 32000-1 12.5.5) stays undistorted?
++    // Recomputed independently here via the spec's own row-vector formula, not by re-calling
++    // this file's composeMatrix -- a genuine check on the consequence, not just the number.
++    const copiedAp = copiedAnnotation?.lookupMaybe(PDFName.of("AP"), PDFDict);
++    const copiedNormal = copiedAp?.lookupMaybe(PDFName.of("N"), PDFStream);
++    const bbox = copiedNormal!.dict.lookup(PDFName.of("BBox"), PDFArray);
++    const bboxValues = Array.from({ length: 4 }, (_, index) => bbox.lookup(index, PDFNumber).asNumber());
++    const matrix = copiedNormal!.dict.lookup(PDFName.of("Matrix"), PDFArray);
++    const [a, b, c, d, e, f] = Array.from({ length: 6 }, (_, index) => matrix.lookup(index, PDFNumber).asNumber());
++    const corners: [number, number][] = [[bboxValues[0]!, bboxValues[1]!], [bboxValues[2]!, bboxValues[1]!], [bboxValues[0]!, bboxValues[3]!], [bboxValues[2]!, bboxValues[3]!]];
++    const transformed = corners.map(([x, y]): [number, number] => [a! * x + c! * y + e!, b! * x + d! * y + f!]);
++    const xs = transformed.map((point) => point[0]); const ys = transformed.map((point) => point[1]);
++    const transformedWidth = Math.max(...xs) - Math.min(...xs);
++    const transformedHeight = Math.max(...ys) - Math.min(...ys);
++    expect(transformedWidth).toBeCloseTo(rectWidth, 6);
++    expect(transformedHeight).toBeCloseTo(rectHeight, 6);
++  });
++
++  it("truncates the footer title so it never runs into the page-number label on a narrow page", async () => {
++    const source = await PDFDocument.create();
++    source.addPage([200, 300]); // narrow enough that the full title cannot fit
++    const sourceBytes = await source.save();
++    const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
++    const project = projectWithManualDecision("keep");
++    project.title = "A Very Long Evidence Pack Title That Will Not Fit On A Narrow Imported Page";
++    project.evidence[0] = { ...project.evidence[0]!, sourceType: "pdf", mimeType: "application/pdf", manualRedactions: [] };
++
++    const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]));
++    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
++    const document_ = await pdfjs.getDocument({ data: new Uint8Array(await result.arrayBuffer()) }).promise;
++    const evidencePage = await document_.getPage(3); // 1-indexed; page 2 (0-indexed) above
++    const content = await evidencePage.getTextContent();
++    const strings = content.items.map((item) => ("str" in item ? item.str : ""));
++    const titleText = strings.find((text) => text.length > 0 && project.title.startsWith(text));
++    expect(titleText).toBeDefined();
++    // Truncated, not the full title -- and what IS drawn must be a genuine prefix, not garbled.
++    expect(titleText!.length).toBeLessThan(project.title.length);
++    expect(project.title.startsWith(titleText!)).toBe(true);
+   });
+ 
+   it("moves line, polygon, callout and ink annotation geometry with the shifted content", async () => {
