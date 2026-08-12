@@ -105,7 +105,7 @@ jobs:
             release-packages/tracepack-evidence-sdk-*.tgz \
             release-packages/tracepack-cli-*.tgz
           do
-            npm publish "$package" --access public --provenance
+            npm publish "./$package" --access public --provenance
           done
 
       - name: Attach the verified files to the GitHub release
