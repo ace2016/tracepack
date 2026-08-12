@@ -64,6 +64,8 @@ workflow uses Node 24 and updates npm before publishing.
 ## Release routine
 
 1. Update package versions intentionally.
+   The `developer-v<version>` tag must match all four package versions or the workflow stops
+   before signing or publishing.
 2. Run `pnpm run build:sdk`, `pnpm -r typecheck` and `pnpm -r test`.
 3. Run `pnpm run release:check` and review all four generated archives.
 4. Merge the reviewed change into the public repository.

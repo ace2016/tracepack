@@ -10,6 +10,18 @@ const packages = [
   "evidence-sdk",
   "cli",
 ];
+const releaseTag = process.env.TRACEPACK_RELEASE_TAG;
+const releaseTagMatch = releaseTag?.match(
+  /^developer-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/,
+);
+
+if (releaseTag && !releaseTagMatch) {
+  fail(`release tag ${releaseTag} must use developer-v<version>`);
+}
+
+const expectedVersion = releaseTagMatch?.[1] ?? JSON.parse(
+  readFileSync(join(root, "packages", "evidence-core", "package.json"), "utf8"),
+).version;
 
 function run(command, args, cwd = root) {
   execFileSync(command, args, { cwd, stdio: "inherit" });
@@ -34,7 +46,9 @@ try {
     const expectedName = `@tracepack/${folder}`;
 
     if (manifest.name !== expectedName) fail(`${folder} has unexpected name ${manifest.name}`);
-    if (manifest.version !== "0.1.0") fail(`${manifest.name} is not version 0.1.0`);
+    if (manifest.version !== expectedVersion) {
+      fail(`${manifest.name} version ${manifest.version} does not match ${expectedVersion}`);
+    }
     if (manifest.private === true) fail(`${manifest.name} is marked private`);
     if (manifest.license !== "Apache-2.0") fail(`${manifest.name} is not Apache-2.0`);
     if (manifest.publishConfig?.access !== "public") fail(`${manifest.name} is not configured for public access`);

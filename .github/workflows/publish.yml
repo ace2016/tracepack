@@ -38,6 +38,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify source, tests and package metadata
+        env:
+          TRACEPACK_RELEASE_TAG: ${{ github.ref_name }}
         run: pnpm run release:check
 
       - name: Create the reviewed package archives
@@ -80,6 +82,16 @@ jobs:
         working-directory: release-packages
         run: sha256sum *.tgz *.sigstore.json > SHA256SUMS
 
+      - name: Preserve signed archives before publication
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracepack-developer-packages-${{ github.ref_name }}
+          path: |
+            release-packages/*.tgz
+            release-packages/*.sigstore.json
+            release-packages/SHA256SUMS
+          if-no-files-found: error
+
       - name: Publish with npm provenance
         env:
           # The first release uses a short lived granular token because npm cannot attach a
@@ -95,16 +107,6 @@ jobs:
           do
             npm publish "$package" --access public --provenance
           done
-
-      - name: Keep the reviewed archives and verification material
-        uses: actions/upload-artifact@v4
-        with:
-          name: tracepack-developer-packages-${{ github.ref_name }}
-          path: |
-            release-packages/*.tgz
-            release-packages/*.sigstore.json
-            release-packages/SHA256SUMS
-          if-no-files-found: error
 
       - name: Attach the verified files to the GitHub release
         env:
