@@ -49,6 +49,84 @@ describe("manual image redaction export gate", () => {
     await expect(buildEvidencePack(project, new Map())).resolves.toBeInstanceOf(Blob);
   });
 
+  it("rejects an image region stored against PDF evidence", async () => {
+    const project = projectWithManualDecision("remove");
+
+    project.evidence[0] = {
+      ...project.evidence[0]!,
+      sourceType: "pdf",
+      mimeType: "application/pdf",
+      manualRedactions: [{
+        id: "wrong-kind-1",
+        kind: "image-region",
+        x: .1,
+        y: .2,
+        width: .3,
+        height: .1,
+        decision: "remove",
+        createdAt: "2026-08-10T00:00:00.000Z",
+      }],
+    };
+
+    await expect(
+      buildEvidencePack(project, new Map()),
+    ).rejects.toThrow(/do not match their evidence type/);
+  });
+
+  it("rejects a PDF region stored against image evidence", async () => {
+    const project = projectWithManualDecision("remove");
+
+    project.evidence[0] = {
+      ...project.evidence[0]!,
+      manualRedactions: [{
+        id: "wrong-kind-2",
+        kind: "pdf-region",
+        pageNumber: 1,
+        x: .1,
+        y: .2,
+        width: .3,
+        height: .1,
+        decision: "remove",
+        createdAt: "2026-08-10T00:00:00.000Z",
+      }],
+    };
+
+    await expect(
+      buildEvidencePack(project, new Map()),
+    ).rejects.toThrow(/do not match their evidence type/);
+  });
+
+  it("rejects duplicate manual redaction region identities", async () => {
+    const project = projectWithManualDecision("remove");
+
+    project.evidence[0]!.manualRedactions = [
+      {
+        id: "duplicate-region",
+        kind: "image-region",
+        x: .1,
+        y: .2,
+        width: .2,
+        height: .1,
+        decision: "remove",
+        createdAt: "2026-08-10T00:00:00.000Z",
+      },
+      {
+        id: "duplicate-region",
+        kind: "image-region",
+        x: .5,
+        y: .6,
+        width: .2,
+        height: .1,
+        decision: "remove",
+        createdAt: "2026-08-10T00:00:00.000Z",
+      },
+    ];
+
+    await expect(
+      buildEvidencePack(project, new Map()),
+    ).rejects.toThrow(/IDs must be unique/);
+  });
+
   it("requires a page number for every manual PDF region", async () => {
     const project = projectWithManualDecision("remove");
     project.evidence[0] = {
@@ -119,15 +197,28 @@ describe("manual image redaction export gate", () => {
       mimeType: "application/pdf",
       manualRedactions: [{ id: "pdf-region-1", kind: "pdf-region", pageNumber: 1, x: .1, y: .2, width: .3, height: .1, decision: "remove", createdAt: "2026-08-10T00:00:00.000Z" }],
     };
-    const onePixelJpeg = Uint8Array.from(atob("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////2wBDAf//////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9k="), (character) => character.charCodeAt(0));
+    const onePixelJpeg = Uint8Array.from(atob("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABD/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAEDAQE/EH//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oACAEBAAE/EH//2Q=="), (character) => character.charCodeAt(0));
     let receivedManualSelection = false;
 
-    await buildEvidencePack(project, new Map([["image-1", sourceBlob]]), async (_file, pageNumber, findings, manualRegions) => {
+    const result = await buildEvidencePack(project, new Map([["image-1", sourceBlob]]), async (_file, pageNumber, findings, manualRegions) => {
       receivedManualSelection = pageNumber === 1 && findings.length === 0 && manualRegions?.[0]?.id === "pdf-region-1";
-      return { bytes: onePixelJpeg.buffer, width: 300, height: 400 };
+
+      return {
+        bytes: onePixelJpeg.buffer,
+        width: 300,
+        height: 400,
+        appliedManualRegionIds: manualRegions?.map((region) => region.id) ?? [],
+      };
     });
 
     expect(receivedManualSelection).toBe(true);
+
+    const exported = await PDFDocument.load(await result.arrayBuffer());
+    const evidencePage = exported.getPage(2);
+
+    expect(exported.getPageCount()).toBe(3);
+    expect(evidencePage.getWidth()).toBe(300);
+    expect(evidencePage.getHeight()).toBe(446);
   });
 
   it("reserves a footer strip below imported PDF evidence", async () => {

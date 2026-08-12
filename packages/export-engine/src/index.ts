@@ -412,6 +412,44 @@ export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, f
 };
 
 export async function buildEvidencePack(project: TracepackProject, files: Map<string, Blob>, rasterizer: PdfRasterizer = rasterizeRedactedPage) {
+  const includedManualEvidence = project.evidence.filter(
+    (item) => item.reviewStatus !== "excluded",
+  );
+
+  const incompatibleManualRegions = includedManualEvidence.flatMap((item) =>
+    (item.manualRedactions ?? []).filter((region) =>
+      (region.kind === "pdf-region" && item.sourceType !== "pdf")
+      || (
+        region.kind === "image-region"
+        && item.sourceType !== "image"
+        && item.sourceType !== "webpage"
+      ),
+    ),
+  );
+
+  if (incompatibleManualRegions.length > 0) {
+    throw new Error(
+      `Fix ${incompatibleManualRegions.length} manual redaction region` +
+      `${incompatibleManualRegions.length === 1 ? "" : "s"} that do not match ` +
+      `their evidence type before export.`,
+    );
+  }
+
+  for (const item of includedManualEvidence) {
+    const manualRegions = item.manualRedactions ?? [];
+    const regionIds = new Set();
+
+    for (const region of manualRegions) {
+      if (regionIds.has(region.id)) {
+        throw new Error(
+          `Manual redaction region IDs must be unique within each evidence item before export.`,
+        );
+      }
+
+      regionIds.add(region.id);
+    }
+  }
+
   const includedPdfRegions = project.evidence
     .filter((item) => item.reviewStatus !== "excluded")
     .flatMap((item) => item.manualRedactions ?? [])
