@@ -19,6 +19,6 @@
     "test": "vitest run",
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
-  "devDependencies": { "esbuild": "^0.28.1", "typescript": "^5.9.2", "vitest": "^3.2.4" },
+  "devDependencies": { "esbuild": "^0.28.2", "typescript": "^7.0.2", "vitest": "^4.1.10" },
   "engines": { "node": ">=18" }
 }

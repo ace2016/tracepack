@@ -14,11 +14,11 @@
     "@tracepack/storage": "workspace:*"
   },
   "devDependencies": {
-    "@types/chrome": "^0.1.1",
+    "@types/chrome": "^0.2.5",
     "pdf-lib": "^1.17.1",
     "playwright": "^1.56.1",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.4",
-    "vitest": "^3.2.4"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
   }
 }
