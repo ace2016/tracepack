@@ -1,3 +1,13 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Local patch and temporary files
+*.patch
+*.rej
+*.orig
+
+# Local patch and temporary files
+*.patch
+*.rej
+*.orig
