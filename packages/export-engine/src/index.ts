@@ -358,9 +358,9 @@ export async function flattenImageRedactions(source: Blob, regions: ManualImageR
 }
 
 export interface RasterizedPage { bytes: ArrayBuffer; width: number; height: number }
-export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[]) => Promise<RasterizedPage>;
+export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[], manualRegions?: ManualImageRedaction[]) => Promise<RasterizedPage>;
 
-export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, findings) => {
+export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, findings, manualRegions = []) => {
   if (typeof document === "undefined") throw new Error("Secure redaction requires a browser canvas.");
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -379,12 +379,26 @@ export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, f
     const [left, bottom, right, top] = viewport.convertToViewportRectangle([x - 2, y - 2, x + width + 2, y + height + 2]);
     context.fillRect(Math.min(left, right), Math.min(bottom, top), Math.abs(right - left), Math.abs(top - bottom));
   }
+  for (const region of manualRegions) {
+    context.fillRect(
+      Math.max(0, region.x) * canvas.width,
+      Math.max(0, region.y) * canvas.height,
+      Math.min(1 - region.x, region.width) * canvas.width,
+      Math.min(1 - region.y, region.height) * canvas.height,
+    );
+  }
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("The redacted page could not be flattened.")), "image/jpeg", 0.92));
-  const [viewX = 0, viewY = 0, viewRight = viewport.width / 2, viewTop = viewport.height / 2] = page.view;
-  return { bytes: await blob.arrayBuffer(), width: viewRight - viewX, height: viewTop - viewY };
+  return { bytes: await blob.arrayBuffer(), width: viewport.width / 2, height: viewport.height / 2 };
 };
 
 export async function buildEvidencePack(project: TracepackProject, files: Map<string, Blob>, rasterizer: PdfRasterizer = rasterizeRedactedPage) {
+  const invalidPdfRegions = project.evidence
+    .filter((item) => item.reviewStatus !== "excluded")
+    .flatMap((item) => item.manualRedactions ?? [])
+    .filter((region) => region.kind === "pdf-region" && (!Number.isInteger(region.pageNumber) || (region.pageNumber ?? 0) < 1));
+  if (invalidPdfRegions.length > 0) {
+    throw new Error(`Choose a PDF page for ${invalidPdfRegions.length} manual redaction${invalidPdfRegions.length === 1 ? "" : "s"} before export.`);
+  }
   const unresolvedManual = project.evidence.filter((item) => item.reviewStatus !== "excluded").flatMap((item) => item.manualRedactions ?? []).filter((region) => region.decision === "unreviewed");
   if (unresolvedManual.length > 0) throw new Error(`Review ${unresolvedManual.length} manual image redaction${unresolvedManual.length === 1 ? "" : "s"} before export.`);
   const output = await PDFDocument.create(); const regular = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
@@ -409,14 +423,16 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
       try {
         const source = await PDFDocument.load(await blob.arrayBuffer(), { ignoreEncryption: true });
         const removals = (item.privacyFindings ?? []).filter((finding) => finding.decision === "remove" && finding.location);
+        const manualRemovals = (item.manualRedactions ?? []).filter((region) => region.kind === "pdf-region" && region.decision === "remove");
         for (const pageIndex of source.getPageIndices()) {
           const pageNumber = pageIndex + 1;
           const pageFindings = removals.filter((finding) => finding.location?.pageNumber === pageNumber);
-          if (pageFindings.length === 0) {
+          const pageManualRegions = manualRemovals.filter((region) => region.pageNumber === pageNumber);
+          if (pageFindings.length === 0 && pageManualRegions.length === 0) {
             await copyImportedPageWithFooter(output, source, pageIndex);
             continue;
           }
-          const flattened = await rasterizer(blob, pageNumber, pageFindings);
+          const flattened = await rasterizer(blob, pageNumber, pageFindings, pageManualRegions);
           const image = await output.embedJpg(flattened.bytes);
           const page = output.addPage([flattened.width, flattened.height + 46]);
           page.drawImage(image, { x: 0, y: 46, width: flattened.width, height: flattened.height });

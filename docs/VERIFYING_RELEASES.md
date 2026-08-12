@@ -26,7 +26,7 @@ Download an archive and its matching `.sigstore.json` file from the same GitHub 
 the release checksum first:
 
 ```sh
-sha256sum --check SHA256SUMS
+sha256sum --ignore-missing --check SHA256SUMS
 ```
 
 Then verify the Sigstore bundle. Replace the tag and archive name with the release you downloaded:

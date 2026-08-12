@@ -49,6 +49,41 @@ describe("manual image redaction export gate", () => {
     await expect(buildEvidencePack(project, new Map())).resolves.toBeInstanceOf(Blob);
   });
 
+  it("requires a page number for every manual PDF region", async () => {
+    const project = projectWithManualDecision("remove");
+    project.evidence[0] = {
+      ...project.evidence[0]!,
+      sourceType: "pdf",
+      mimeType: "application/pdf",
+      manualRedactions: [{ id: "pdf-region-1", kind: "pdf-region", x: .1, y: .2, width: .3, height: .1, decision: "remove", createdAt: "2026-08-10T00:00:00.000Z" }],
+    };
+
+    await expect(buildEvidencePack(project, new Map())).rejects.toThrow("Choose a PDF page for 1 manual redaction before export");
+  });
+
+  it("passes an approved manual PDF selection to the secure page rasterizer", async () => {
+    const source = await PDFDocument.create();
+    source.addPage([300, 400]);
+    const sourceBytes = await source.save();
+    const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
+    const project = projectWithManualDecision("remove");
+    project.evidence[0] = {
+      ...project.evidence[0]!,
+      sourceType: "pdf",
+      mimeType: "application/pdf",
+      manualRedactions: [{ id: "pdf-region-1", kind: "pdf-region", pageNumber: 1, x: .1, y: .2, width: .3, height: .1, decision: "remove", createdAt: "2026-08-10T00:00:00.000Z" }],
+    };
+    const onePixelJpeg = Uint8Array.from(atob("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////2wBDAf//////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9k="), (character) => character.charCodeAt(0));
+    let receivedManualSelection = false;
+
+    await buildEvidencePack(project, new Map([["image-1", sourceBlob]]), async (_file, pageNumber, findings, manualRegions) => {
+      receivedManualSelection = pageNumber === 1 && findings.length === 0 && manualRegions?.[0]?.id === "pdf-region-1";
+      return { bytes: onePixelJpeg.buffer, width: 300, height: 400 };
+    });
+
+    expect(receivedManualSelection).toBe(true);
+  });
+
   it("reserves a footer strip below imported PDF evidence", async () => {
     const source = await PDFDocument.create();
     source.addPage([300, 400]);
