@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadTemplate, parseTemplateObject } from "../src/index";
+import { loadTemplate, parseTemplateObject, serializeTemplate } from "../src/index";
 
 function minimalTemplate(privacyRules?: Array<{ kind: string; label: string; pattern: string; flags?: string }>) {
   return {
@@ -62,5 +62,33 @@ categories:
 export_sections: [cover]
 `;
     expect(() => loadTemplate(yaml)).toThrow(/pattern and flags together/);
+  });
+});
+
+describe("serializeTemplate", () => {
+  it("round trips a reusable template file without losing its rules", () => {
+    const original = parseTemplateObject({
+      ...minimalTemplate([{ kind: "reference", label: "Reference", pattern: "REF-[0-9]+", flags: "i" }]),
+      chronology_rules: { max_gap_days: 30 },
+      guidance: [{ category_id: "docs", text: "Make the date visible." }],
+    });
+    expect(loadTemplate(serializeTemplate(original))).toEqual(original);
+  });
+
+  it("never exports local trust labels into a portable template file", () => {
+    const template = { ...parseTemplateObject(minimalTemplate()), localOrigin: "imported" as const, importedFileName: "outside.yaml" };
+    const yaml = serializeTemplate(template);
+    expect(yaml).not.toContain("localOrigin");
+    expect(yaml).not.toContain("importedFileName");
+  });
+});
+
+describe("external template validation", () => {
+  it("rejects duplicate category identities with a human explanation", () => {
+    expect(() => loadTemplate(`id: duplicate\nname: Duplicate\nversion: "1"\njurisdiction: general\ncategories:\n  - { id: docs, name: First, requirement: required, description: '', accepted_types: [pdf] }\n  - { id: docs, name: Second, requirement: optional, description: '', accepted_types: [image] }\nexport_sections: [cover]\n`)).toThrow(/category identities must be unique/);
+  });
+
+  it("rejects guidance for a category that does not exist", () => {
+    expect(() => parseTemplateObject({ ...minimalTemplate(), guidance: [{ category_id: "missing", text: "Help" }] })).toThrow(/must refer to a category/);
   });
 });

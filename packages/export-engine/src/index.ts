@@ -357,10 +357,25 @@ export async function flattenImageRedactions(source: Blob, regions: ManualImageR
   }
 }
 
-export interface RasterizedPage { bytes: ArrayBuffer; width: number; height: number }
-export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[]) => Promise<RasterizedPage>;
+export interface RasterizedPage {
+  bytes: ArrayBuffer;
+  width: number;
+  height: number;
+  appliedManualRegionIds?: string[];
+}
+export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[], manualRegions?: ManualImageRedaction[]) => Promise<RasterizedPage>;
 
-export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, findings) => {
+function isValidNormalisedPdfRegion(region: ManualImageRedaction) {
+  const coordinates = [region.x, region.y, region.width, region.height];
+  return coordinates.every(Number.isFinite)
+    && region.x >= 0 && region.x < 1
+    && region.y >= 0 && region.y < 1
+    && region.width > 0 && region.height > 0
+    && Math.min(1, region.x + region.width) > region.x
+    && Math.min(1, region.y + region.height) > region.y;
+}
+
+export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, findings, manualRegions = []) => {
   if (typeof document === "undefined") throw new Error("Secure redaction requires a browser canvas.");
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -379,12 +394,92 @@ export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, f
     const [left, bottom, right, top] = viewport.convertToViewportRectangle([x - 2, y - 2, x + width + 2, y + height + 2]);
     context.fillRect(Math.min(left, right), Math.min(bottom, top), Math.abs(right - left), Math.abs(top - bottom));
   }
+  for (const region of manualRegions) {
+    context.fillRect(
+      Math.max(0, region.x) * canvas.width,
+      Math.max(0, region.y) * canvas.height,
+      Math.min(1 - region.x, region.width) * canvas.width,
+      Math.min(1 - region.y, region.height) * canvas.height,
+    );
+  }
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("The redacted page could not be flattened.")), "image/jpeg", 0.92));
-  const [viewX = 0, viewY = 0, viewRight = viewport.width / 2, viewTop = viewport.height / 2] = page.view;
-  return { bytes: await blob.arrayBuffer(), width: viewRight - viewX, height: viewTop - viewY };
+  return {
+    bytes: await blob.arrayBuffer(),
+    width: viewport.width / 2,
+    height: viewport.height / 2,
+    appliedManualRegionIds: manualRegions.map((region) => region.id),
+  };
 };
 
 export async function buildEvidencePack(project: TracepackProject, files: Map<string, Blob>, rasterizer: PdfRasterizer = rasterizeRedactedPage) {
+  const includedManualEvidence = project.evidence.filter(
+    (item) => item.reviewStatus !== "excluded",
+  );
+
+  const incompatibleManualRegions = includedManualEvidence.flatMap((item) =>
+    (item.manualRedactions ?? []).filter((region) =>
+      (region.kind === "pdf-region" && item.sourceType !== "pdf")
+      || (
+        region.kind === "image-region"
+        && item.sourceType !== "image"
+        && item.sourceType !== "webpage"
+      ),
+    ),
+  );
+
+  if (incompatibleManualRegions.length > 0) {
+    throw new Error(
+      `Fix ${incompatibleManualRegions.length} manual redaction region` +
+      `${incompatibleManualRegions.length === 1 ? "" : "s"} that do not match ` +
+      `their evidence type before export.`,
+    );
+  }
+
+  for (const item of includedManualEvidence) {
+    const manualRegions = item.manualRedactions ?? [];
+    const regionIds = new Set();
+
+    for (const region of manualRegions) {
+      if (regionIds.has(region.id)) {
+        throw new Error(
+          `Manual redaction region IDs must be unique within each evidence item before export.`,
+        );
+      }
+
+      regionIds.add(region.id);
+    }
+  }
+
+  const includedPdfRegions = project.evidence
+    .filter((item) => item.reviewStatus !== "excluded")
+    .flatMap((item) => item.manualRedactions ?? [])
+    .filter((region) => region.kind === "pdf-region");
+  const invalidPdfPages = includedPdfRegions.filter((region) => !Number.isInteger(region.pageNumber) || (region.pageNumber ?? 0) < 1);
+  if (invalidPdfPages.length > 0) {
+    throw new Error(`Choose a PDF page for ${invalidPdfPages.length} manual redaction${invalidPdfPages.length === 1 ? "" : "s"} before export.`);
+  }
+  const invalidPdfRectangles = includedPdfRegions.filter((region) => region.decision === "remove" && !isValidNormalisedPdfRegion(region));
+  if (invalidPdfRectangles.length > 0) {
+    throw new Error(`Redraw ${invalidPdfRectangles.length} invalid PDF redaction region${invalidPdfRectangles.length === 1 ? "" : "s"} before export.`);
+  }
+  for (const item of project.evidence.filter((entry) => entry.reviewStatus !== "excluded" && entry.sourceType === "pdf")) {
+    const manualRemovals = (item.manualRedactions ?? []).filter((region) => region.kind === "pdf-region" && region.decision === "remove");
+    const blob = files.get(item.id);
+    if (manualRemovals.length === 0 || !blob) continue;
+    let source: PDFDocument;
+    try {
+      source = await PDFDocument.load(await blob.arrayBuffer(), { ignoreEncryption: true });
+    } catch {
+      // Unreadable PDFs are handled later with a visible omission page. The range check can
+      // only be performed when the source document itself can be opened.
+      continue;
+    }
+    const pageCount = source.getPageCount();
+    const outsideDocument = manualRemovals.filter((region) => (region.pageNumber ?? 0) > pageCount);
+    if (outsideDocument.length > 0) {
+      throw new Error(`A manual PDF redaction targets a page outside the ${pageCount}-page document.`);
+    }
+  }
   const unresolvedManual = project.evidence.filter((item) => item.reviewStatus !== "excluded").flatMap((item) => item.manualRedactions ?? []).filter((region) => region.decision === "unreviewed");
   if (unresolvedManual.length > 0) throw new Error(`Review ${unresolvedManual.length} manual image redaction${unresolvedManual.length === 1 ? "" : "s"} before export.`);
   const output = await PDFDocument.create(); const regular = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);
@@ -409,14 +504,36 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
       try {
         const source = await PDFDocument.load(await blob.arrayBuffer(), { ignoreEncryption: true });
         const removals = (item.privacyFindings ?? []).filter((finding) => finding.decision === "remove" && finding.location);
+        const manualRemovals = (item.manualRedactions ?? []).filter((region) => region.kind === "pdf-region" && region.decision === "remove");
         for (const pageIndex of source.getPageIndices()) {
           const pageNumber = pageIndex + 1;
           const pageFindings = removals.filter((finding) => finding.location?.pageNumber === pageNumber);
-          if (pageFindings.length === 0) {
+          const pageManualRegions = manualRemovals.filter((region) => region.pageNumber === pageNumber);
+          if (pageFindings.length === 0 && pageManualRegions.length === 0) {
             await copyImportedPageWithFooter(output, source, pageIndex);
             continue;
           }
-          const flattened = await rasterizer(blob, pageNumber, pageFindings);
+          const flattened = await rasterizer(blob, pageNumber, pageFindings, pageManualRegions);
+
+          if (pageManualRegions.length > 0) {
+            const appliedManualRegionIds = new Set(
+              flattened.appliedManualRegionIds ?? [],
+            );
+
+            const unappliedManualRegions = pageManualRegions.filter(
+              (region) => !appliedManualRegionIds.has(region.id),
+            );
+
+            if (unappliedManualRegions.length > 0) {
+              throw new Error(
+                `PDF page ${pageNumber} could not be exported safely because ` +
+                `${unappliedManualRegions.length} manual redaction region` +
+                `${unappliedManualRegions.length === 1 ? "" : "s"} ` +
+                `were not confirmed by the PDF rasterizer.`,
+              );
+            }
+          }
+
           const image = await output.embedJpg(flattened.bytes);
           const page = output.addPage([flattened.width, flattened.height + 46]);
           page.drawImage(image, { x: 0, y: 46, width: flattened.width, height: flattened.height });
@@ -426,7 +543,11 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
         notice.drawText(redactedTitle(item).slice(0, 74), { x: 54, y: 780, size: 14, font: bold });
         notice.drawText("This item could not be included in the export.", { x: 54, y: 750, size: 11, font: bold, color: rgb(0.62, 0.21, 0.17) });
         let noticeY = 726;
-        for (const line of wrap(`The stored file for "${redactedTitle(item)}" could not be read as a PDF and was skipped: ${cause instanceof Error ? cause.message : String(cause)}`, 82)) {
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        const explanation = reason.includes("not confirmed by the PDF rasterizer")
+          ? `The stored file for "${redactedTitle(item)}" was not included because its manual redactions could not be confirmed. Tracepack omitted the PDF rather than risk exporting private content: ${reason}`
+          : `The stored file for "${redactedTitle(item)}" could not be read as a PDF and was skipped: ${reason}`;
+        for (const line of wrap(explanation, 82)) {
           notice.drawText(line, { x: 54, y: noticeY, size: 9.5, font: regular }); noticeY -= 14;
         }
       }

@@ -23,10 +23,10 @@ export interface EvidenceCategory {
   minItems?: number;
   // Optional Tracepack-owned tag for a semantic concept a category represents, e.g.
   // "correspondence". Not part of the frozen tracepack-evidence v1 payload contract (a
-  // producer never sends this), and not the same thing as `id`, which differs per template
-  // even for categories serving the same concept ("supporting evidence" on one template,
-  // "correspondence" on another). Lets a payload's evidence_type be routed by what it
-  // represents rather than a hardcoded, template-specific category id, see
+  // producer never sends this, see evidence-interchange/SPEC.md), and not the same thing as
+  // `id`, which differs per template even for categories serving the same concept ("supporting
+  // evidence" on one template, "correspondence" on another). Lets a payload's evidence_type be
+  // routed by what it represents rather than a hardcoded, template-specific category id, see
   // guessCategoryByRole in apps/workspace/src/captures.ts.
   role?: string;
 }
@@ -75,6 +75,10 @@ export interface TemplateSnapshot {
   privacyRules?: TemplatePrivacyRule[];
   chronologyRules?: TemplateChronologyRules;
   guidance?: TemplateGuidance[];
+  // Assigned by the workspace and deliberately omitted from exported YAML. An external
+  // template cannot make itself Tracepack approved by declaring trust metadata in its file.
+  localOrigin?: "imported" | "created";
+  importedFileName?: string;
 }
 
 export interface EvidenceItem {
@@ -119,6 +123,16 @@ export interface EvidenceProvenance {
   schemaVersion: 1;
   capturedAt: string;
   sourceUrl?: string;
+  // A producer-supplied human-readable handle for whatever this evidence came from on the
+  // producer's own side, such as a conversation number or a case id. Read from the payload's
+  // free-form `metadata.external_reference`, never required by the schema. Purely a display
+  // convenience; nothing in Tracepack treats it as a stable identifier.
+  externalReference?: string;
+  // Set only on a conversation-style item synthesized from a payload's observations when that
+  // same payload also carried attachments, see evidence-interchange's import.ts. Lets the
+  // workspace show "N attachments" on the summary card without the UI having to search the rest
+  // of the project for items that share this one's provenance.
+  attachmentCount?: number;
 }
 
 export interface ExternalObservation {
@@ -146,7 +160,10 @@ export type PrivacyFindingField = "title" | "filename" | "body";
 
 export interface ManualImageRedaction {
   id: string;
-  kind: "image-region";
+  kind: "image-region" | "pdf-region";
+  // PDF selections are stored as normalised top-left coordinates for the page shown in the
+  // viewer. Older image selections have no page number and remain fully compatible.
+  pageNumber?: number;
   x: number;
   y: number;
   width: number;

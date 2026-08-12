@@ -16,7 +16,7 @@ import { diffManifests, looksLikeTracepackManifest, type TracepackManifest, type
 // plain `fs` calls, not `fetch`, so it needs a filesystem path, not a `file://` URL -- a
 // trailing slash is required, pdfjs appends filenames directly onto this string.
 const pdfjsPackageJson = createRequire(import.meta.url).resolve("pdfjs-dist/package.json");
-const standardFontDataUrl = path.join(path.dirname(pdfjsPackageJson), "standard_fonts") + path.sep;
+const standardFontDataUrl = `${path.join(path.dirname(pdfjsPackageJson), "standard_fonts").replaceAll("\\", "/")}/`;
 
 describe("evidence pack", () => {
   it("creates a valid cover and index PDF", async () => {
@@ -48,6 +48,111 @@ describe("evidence pack", () => {
     expect(rasterized).toBe(true);
     expect(exported.getPageCount()).toBe(3);
     expect(new TextDecoder().decode(await blob.arrayBuffer())).not.toContain("secret@example.com");
+  });
+
+
+  it("fails closed when a custom PDF rasterizer ignores manual regions", async () => {
+    const sourcePdf = await PDFDocument.create();
+    const page = sourcePdf.addPage([200, 200]);
+
+    page.drawText("private value", {
+      x: 20,
+      y: 100,
+      size: 12,
+    });
+
+    const sourceBlob = new Blob(
+      [await sourcePdf.save()],
+      { type: "application/pdf" },
+    );
+
+    const project: TracepackProject = {
+      id: "manual-rasterizer-fail-closed",
+      schemaVersion: 1,
+      title: "Manual PDF redaction",
+      organisation: "Example",
+      summary: "Test",
+      desiredResolution: "None",
+      createdAt: new Date(0).toISOString(),
+      updatedAt: new Date(0).toISOString(),
+
+      template: {
+        id: "consumer-complaint",
+        name: "Consumer complaint",
+        version: "1",
+        jurisdiction: "UK",
+        categories: [],
+        exportSections: [],
+      },
+
+      evidence: [{
+        id: "manual-pdf",
+        projectId: "manual-rasterizer-fail-closed",
+        title: "Private PDF",
+        categoryId: "other",
+        sourceType: "pdf",
+        originalFileName: "private.pdf",
+        importedAt: new Date(0).toISOString(),
+        contentHash: "f".repeat(64),
+        reviewStatus: "reviewed",
+        notes: "",
+        size: sourceBlob.size,
+        mimeType: "application/pdf",
+
+        manualRedactions: [{
+          id: "manual-region-1",
+          kind: "pdf-region",
+          pageNumber: 1,
+          x: 0.1,
+          y: 0.4,
+          width: 0.5,
+          height: 0.2,
+          decision: "remove",
+          createdAt: new Date(0).toISOString(),
+        }],
+      }],
+    };
+
+    // Models an existing three-argument rasterizer.
+    // It returns a result but ignores the manual region completely.
+    const legacyRasterizer = async (
+      _source: Blob,
+      _pageNumber: number,
+      _findings: unknown[],
+    ) => ({
+      bytes: new ArrayBuffer(0),
+      width: 200,
+      height: 200,
+    });
+
+    const blob = await buildEvidencePack(
+      project,
+      new Map([["manual-pdf", sourceBlob]]),
+      legacyRasterizer,
+    );
+
+    const exported = await PDFDocument.load(await blob.arrayBuffer());
+
+    // cover + index + safe omission page
+    expect(exported.getPageCount()).toBe(3);
+
+    const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    const document_ = await pdfjs.getDocument({
+      data: new Uint8Array(await blob.arrayBuffer()),
+      standardFontDataUrl,
+    }).promise;
+
+    let fullText = "";
+
+    for (let pageNumber = 1; pageNumber <= document_.numPages; pageNumber += 1) {
+      const content = await (await document_.getPage(pageNumber)).getTextContent();
+      fullText += content.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ");
+    }
+
+    expect(fullText).toContain("could not be included");
+    expect(fullText).not.toContain("private value");
   });
 
   it("includes a written note as its own page, not silently skipped", async () => {
