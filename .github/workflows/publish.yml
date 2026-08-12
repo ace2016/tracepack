@@ -1,57 +1,118 @@
-name: Publish packages
+name: Publish verified developer packages
 
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "developer-v*"
+
+concurrency:
+  group: tracepack-developer-release
+  cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
   publish:
+    if: github.repository == 'ace2016/tracepack'
     runs-on: ubuntu-latest
+    environment: npm-production
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
-          cache: pnpm
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
-      - name: Install dependencies
+      - name: Use a trusted publishing capable npm client
+        run: npm install --global npm@latest
+
+      - name: Install exactly the reviewed dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build publishable SDK packages
-        run: pnpm run build:sdk
+      - name: Verify source, tests and package metadata
+        run: pnpm run release:check
 
-      - name: Build CLI package
-        run: pnpm --filter @tracepack/cli build
+      - name: Create the reviewed package archives
+        run: |
+          mkdir release-packages
+          pnpm --filter @tracepack/evidence-core pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/template-engine pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/evidence-sdk pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/cli pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
 
-      - name: Typecheck all packages
-        run: pnpm -r typecheck
+      - name: Test the archives in a clean project
+        run: |
+          mkdir release-smoke
+          cd release-smoke
+          npm init --yes
+          npm install ../release-packages/tracepack-evidence-core-*.tgz \
+            ../release-packages/tracepack-template-engine-*.tgz \
+            ../release-packages/tracepack-evidence-sdk-*.tgz \
+            ../release-packages/tracepack-cli-*.tgz
+          node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk')]).then(() => console.log('SDK imports passed'))"
+          ./node_modules/.bin/tracepack --help
 
-      - name: Test all packages
-        run: pnpm -r test
+      - uses: sigstore/cosign-installer@v3.10.0
 
-      - name: Publish evidence-core
-        run: pnpm --filter @tracepack/evidence-core publish --access public --provenance --no-git-checks
+      - name: Sign and verify each archive with Sigstore
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          CERTIFICATE_IDENTITY: https://github.com/ace2016/tracepack/.github/workflows/publish.yml@${{ github.ref }}
+          CERTIFICATE_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          for package in release-packages/*.tgz; do
+            cosign sign-blob --yes --bundle "${package}.sigstore.json" "$package"
+            cosign verify-blob \
+              --bundle "${package}.sigstore.json" \
+              --certificate-identity "$CERTIFICATE_IDENTITY" \
+              --certificate-oidc-issuer "$CERTIFICATE_ISSUER" \
+              "$package"
+          done
 
-      - name: Publish evidence-sdk
-        run: pnpm --filter @tracepack/evidence-sdk publish --access public --provenance --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Create release checksums
+        working-directory: release-packages
+        run: sha256sum *.tgz *.sigstore.json > SHA256SUMS
 
-      - name: Publish template-engine
-        run: pnpm --filter @tracepack/template-engine publish --access public --provenance --no-git-checks
+      - name: Publish with npm provenance
         env:
+          # The first release uses a short lived granular token because npm cannot attach a
+          # trusted publisher to a package that does not exist yet. Delete this secret after
+          # trusted publishing is configured for all four packages.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for package in \
+            release-packages/tracepack-evidence-core-*.tgz \
+            release-packages/tracepack-template-engine-*.tgz \
+            release-packages/tracepack-evidence-sdk-*.tgz \
+            release-packages/tracepack-cli-*.tgz
+          do
+            npm publish "$package" --access public --provenance
+          done
 
-      - name: Publish cli
-        run: pnpm --filter @tracepack/cli publish --access public --provenance --no-git-checks
+      - name: Keep the reviewed archives and verification material
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracepack-developer-packages-${{ github.ref_name }}
+          path: |
+            release-packages/*.tgz
+            release-packages/*.sigstore.json
+            release-packages/SHA256SUMS
+          if-no-files-found: error
+
+      - name: Attach the verified files to the GitHub release
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Tracepack developer packages $GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            release-packages/*.tgz \
+            release-packages/*.sigstore.json \
+            release-packages/SHA256SUMS

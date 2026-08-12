@@ -1,4 +1,4 @@
-import { parse } from "yaml";
+import { parse, stringify } from "yaml";
 import { z } from "zod";
 import type { TemplateSnapshot } from "@tracepack/evidence-core";
 
@@ -67,6 +67,15 @@ const templateSchema = z.object({
     category_id: z.string().min(1),
     text: z.string().min(1),
   })).optional(),
+}).superRefine((template, context) => {
+  const categoryIds = new Set<string>();
+  template.categories.forEach((category, index) => {
+    if (categoryIds.has(category.id)) context.addIssue({ code: "custom", path: ["categories", index, "id"], message: "category identities must be unique" });
+    categoryIds.add(category.id);
+  });
+  template.guidance?.forEach((entry, index) => {
+    if (!categoryIds.has(entry.category_id)) context.addIssue({ code: "custom", path: ["guidance", index, "category_id"], message: "must refer to a category in this template" });
+  });
 });
 
 // Shared by loadTemplate (file-authored YAML) and parseTemplateObject (a template built at
@@ -96,11 +105,45 @@ function fromParsed(value: z.infer<typeof templateSchema>): TemplateSnapshot {
 }
 
 export function loadTemplate(yaml: string): TemplateSnapshot {
-  return fromParsed(templateSchema.parse(parse(yaml)));
+  if (yaml.length > 250_000) throw new Error("This template file is too large. Tracepack template files must be smaller than 250 KB.");
+  let parsed: unknown;
+  try { parsed = parse(yaml); }
+  catch { throw new Error("This is not a readable YAML template file."); }
+  const result = templateSchema.safeParse(parsed);
+  if (!result.success) {
+    const details = result.error.issues.slice(0, 3).map((issue) => `${issue.path.join(".") || "template"}: ${issue.message}`).join("; ");
+    throw new Error(`This file does not follow the Tracepack template structure. ${details}`);
+  }
+  return fromParsed(result.data);
 }
 
 // For templates that never existed as a file, e.g. one a user assembles by hand in the
 // workspace app. Same schema, same errors, just skipping the YAML parse step.
 export function parseTemplateObject(value: unknown): TemplateSnapshot {
   return fromParsed(templateSchema.parse(value));
+}
+
+export function serializeTemplate(template: TemplateSnapshot): string {
+  const portable = {
+    id: template.id,
+    name: template.name,
+    version: template.version,
+    jurisdiction: template.jurisdiction,
+    categories: template.categories.map(({ acceptedTypes, minItems, ...category }) => ({
+      ...category,
+      accepted_types: acceptedTypes,
+      ...(minItems ? { min_items: minItems } : {}),
+    })),
+    export_sections: template.exportSections,
+    ...(template.summaryLabel || template.summaryPlaceholder || template.resolutionLabel || template.resolutionPlaceholder ? { intake: {
+      ...(template.summaryLabel ? { summary_label: template.summaryLabel } : {}),
+      ...(template.summaryPlaceholder ? { summary_placeholder: template.summaryPlaceholder } : {}),
+      ...(template.resolutionLabel ? { resolution_label: template.resolutionLabel } : {}),
+      ...(template.resolutionPlaceholder ? { resolution_placeholder: template.resolutionPlaceholder } : {}),
+    } } : {}),
+    ...(template.privacyRules?.length ? { privacy_rules: template.privacyRules } : {}),
+    ...(template.chronologyRules ? { chronology_rules: { max_gap_days: template.chronologyRules.maxGapDays } } : {}),
+    ...(template.guidance?.length ? { guidance: template.guidance.map((entry) => ({ category_id: entry.categoryId, text: entry.text })) } : {}),
+  };
+  return stringify(portable, { lineWidth: 0 });
 }

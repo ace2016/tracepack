@@ -78,8 +78,11 @@ describe("clean-room producer: Consumer Rights Helper", () => {
     const result = await importEvidencePayload(payload, { project, categoryId: "warranty_evidence" });
 
     // 7: accepted — no throw, a real EvidenceItem was created.
-    expect(result.createdEvidenceIds).toHaveLength(1);
-    const item = result.project.evidence[0]!;
+    const item = result.project.evidence.find((entry) => entry.sourceType === "pdf")!;
+    // The current importer may also create a clearly labelled Tracepack-generated summary
+    // card for producer observations. Assert the original attachment was created without
+    // coupling this clean-room test to the number of additional derived representations.
+    expect(result.createdEvidenceIds).toContain(item.id);
 
     // 8: provenance preserved, matching exactly what the producer declared.
     expect(item.provenance).toEqual({
@@ -118,7 +121,7 @@ describe("clean-room producer: Consumer Rights Helper", () => {
 
     // 14: the exported PDF attributes the observation to the producer, never to Tracepack.
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-    const doc = await pdfjs.getDocument({ data: packBytes, standardFontDataUrl }).promise;
+    const doc = await pdfjs.getDocument({ data: packBytes, standardFontDataUrl: standardFontDataUrl.replace(/\\/g, "/") }).promise;
     let fullText = "";
     for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
       const content = await (await doc.getPage(pageNumber)).getTextContent();

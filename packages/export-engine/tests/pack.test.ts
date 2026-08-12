@@ -16,7 +16,7 @@ import { diffManifests, looksLikeTracepackManifest, type TracepackManifest, type
 // plain `fs` calls, not `fetch`, so it needs a filesystem path, not a `file://` URL -- a
 // trailing slash is required, pdfjs appends filenames directly onto this string.
 const pdfjsPackageJson = createRequire(import.meta.url).resolve("pdfjs-dist/package.json");
-const standardFontDataUrl = path.join(path.dirname(pdfjsPackageJson), "standard_fonts") + path.sep;
+const standardFontDataUrl = `${path.join(path.dirname(pdfjsPackageJson), "standard_fonts").replaceAll("\\", "/")}/`;
 
 describe("evidence pack", () => {
   it("creates a valid cover and index PDF", async () => {
