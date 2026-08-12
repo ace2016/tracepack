@@ -360,6 +360,16 @@ export async function flattenImageRedactions(source: Blob, regions: ManualImageR
 export interface RasterizedPage { bytes: ArrayBuffer; width: number; height: number }
 export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[], manualRegions?: ManualImageRedaction[]) => Promise<RasterizedPage>;
 
+function isValidNormalisedPdfRegion(region: ManualImageRedaction) {
+  const coordinates = [region.x, region.y, region.width, region.height];
+  return coordinates.every(Number.isFinite)
+    && region.x >= 0 && region.x < 1
+    && region.y >= 0 && region.y < 1
+    && region.width > 0 && region.height > 0
+    && Math.min(1, region.x + region.width) > region.x
+    && Math.min(1, region.y + region.height) > region.y;
+}
+
 export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, findings, manualRegions = []) => {
   if (typeof document === "undefined") throw new Error("Secure redaction requires a browser canvas.");
   const pdfjs = await import("pdfjs-dist");
@@ -392,12 +402,17 @@ export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, f
 };
 
 export async function buildEvidencePack(project: TracepackProject, files: Map<string, Blob>, rasterizer: PdfRasterizer = rasterizeRedactedPage) {
-  const invalidPdfRegions = project.evidence
+  const includedPdfRegions = project.evidence
     .filter((item) => item.reviewStatus !== "excluded")
     .flatMap((item) => item.manualRedactions ?? [])
-    .filter((region) => region.kind === "pdf-region" && (!Number.isInteger(region.pageNumber) || (region.pageNumber ?? 0) < 1));
-  if (invalidPdfRegions.length > 0) {
-    throw new Error(`Choose a PDF page for ${invalidPdfRegions.length} manual redaction${invalidPdfRegions.length === 1 ? "" : "s"} before export.`);
+    .filter((region) => region.kind === "pdf-region");
+  const invalidPdfPages = includedPdfRegions.filter((region) => !Number.isInteger(region.pageNumber) || (region.pageNumber ?? 0) < 1);
+  if (invalidPdfPages.length > 0) {
+    throw new Error(`Choose a PDF page for ${invalidPdfPages.length} manual redaction${invalidPdfPages.length === 1 ? "" : "s"} before export.`);
+  }
+  const invalidPdfRectangles = includedPdfRegions.filter((region) => region.decision === "remove" && !isValidNormalisedPdfRegion(region));
+  if (invalidPdfRectangles.length > 0) {
+    throw new Error(`Redraw ${invalidPdfRectangles.length} invalid PDF redaction region${invalidPdfRectangles.length === 1 ? "" : "s"} before export.`);
   }
   for (const item of project.evidence.filter((entry) => entry.reviewStatus !== "excluded" && entry.sourceType === "pdf")) {
     const manualRemovals = (item.manualRedactions ?? []).filter((region) => region.kind === "pdf-region" && region.decision === "remove");

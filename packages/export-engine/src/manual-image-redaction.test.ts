@@ -77,6 +77,36 @@ describe("manual image redaction export gate", () => {
     await expect(buildEvidencePack(project, new Map([["image-1", sourceBlob]]))).rejects.toThrow("outside the 1-page document");
   });
 
+  it.each([
+    ["not a number", { x: Number.NaN }],
+    ["infinite", { width: Number.POSITIVE_INFINITY }],
+    ["left of the page", { x: -.1 }],
+    ["below the page", { y: 1 }],
+    ["empty", { width: 0 }],
+    ["negative", { height: -.1 }],
+  ])("rejects a %s manual PDF removal rectangle", async (_label, replacement) => {
+    const project = projectWithManualDecision("remove");
+    project.evidence[0] = {
+      ...project.evidence[0]!,
+      sourceType: "pdf",
+      mimeType: "application/pdf",
+      manualRedactions: [{
+        id: "pdf-region-invalid",
+        kind: "pdf-region",
+        pageNumber: 1,
+        x: .1,
+        y: .2,
+        width: .3,
+        height: .1,
+        decision: "remove",
+        createdAt: "2026-08-10T00:00:00.000Z",
+        ...replacement,
+      }],
+    };
+
+    await expect(buildEvidencePack(project, new Map())).rejects.toThrow("Redraw 1 invalid PDF redaction region before export");
+  });
+
   it("passes an approved manual PDF selection to the secure page rasterizer", async () => {
     const source = await PDFDocument.create();
     source.addPage([300, 400]);
