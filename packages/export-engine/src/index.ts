@@ -357,7 +357,12 @@ export async function flattenImageRedactions(source: Blob, regions: ManualImageR
   }
 }
 
-export interface RasterizedPage { bytes: ArrayBuffer; width: number; height: number }
+export interface RasterizedPage {
+  bytes: ArrayBuffer;
+  width: number;
+  height: number;
+  appliedManualRegionIds?: string[];
+}
 export type PdfRasterizer = (source: Blob, pageNumber: number, findings: PrivacyFinding[], manualRegions?: ManualImageRedaction[]) => Promise<RasterizedPage>;
 
 function isValidNormalisedPdfRegion(region: ManualImageRedaction) {
@@ -398,7 +403,12 @@ export const rasterizeRedactedPage: PdfRasterizer = async (source, pageNumber, f
     );
   }
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("The redacted page could not be flattened.")), "image/jpeg", 0.92));
-  return { bytes: await blob.arrayBuffer(), width: viewport.width / 2, height: viewport.height / 2 };
+  return {
+    bytes: await blob.arrayBuffer(),
+    width: viewport.width / 2,
+    height: viewport.height / 2,
+    appliedManualRegionIds: manualRegions.map((region) => region.id),
+  };
 };
 
 export async function buildEvidencePack(project: TracepackProject, files: Map<string, Blob>, rasterizer: PdfRasterizer = rasterizeRedactedPage) {
@@ -466,6 +476,26 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
             continue;
           }
           const flattened = await rasterizer(blob, pageNumber, pageFindings, pageManualRegions);
+
+          if (pageManualRegions.length > 0) {
+            const appliedManualRegionIds = new Set(
+              flattened.appliedManualRegionIds ?? [],
+            );
+
+            const unappliedManualRegions = pageManualRegions.filter(
+              (region) => !appliedManualRegionIds.has(region.id),
+            );
+
+            if (unappliedManualRegions.length > 0) {
+              throw new Error(
+                `PDF page ${pageNumber} could not be exported safely because ` +
+                `${unappliedManualRegions.length} manual redaction region` +
+                `${unappliedManualRegions.length === 1 ? "" : "s"} ` +
+                `were not confirmed by the PDF rasterizer.`,
+              );
+            }
+          }
+
           const image = await output.embedJpg(flattened.bytes);
           const page = output.addPage([flattened.width, flattened.height + 46]);
           page.drawImage(image, { x: 0, y: 46, width: flattened.width, height: flattened.height });
@@ -475,7 +505,11 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
         notice.drawText(redactedTitle(item).slice(0, 74), { x: 54, y: 780, size: 14, font: bold });
         notice.drawText("This item could not be included in the export.", { x: 54, y: 750, size: 11, font: bold, color: rgb(0.62, 0.21, 0.17) });
         let noticeY = 726;
-        for (const line of wrap(`The stored file for "${redactedTitle(item)}" could not be read as a PDF and was skipped: ${cause instanceof Error ? cause.message : String(cause)}`, 82)) {
+        const reason = cause instanceof Error ? cause.message : String(cause);
+        const explanation = reason.includes("not confirmed by the PDF rasterizer")
+          ? `The stored file for "${redactedTitle(item)}" was not included because its manual redactions could not be confirmed. Tracepack omitted the PDF rather than risk exporting private content: ${reason}`
+          : `The stored file for "${redactedTitle(item)}" could not be read as a PDF and was skipped: ${reason}`;
+        for (const line of wrap(explanation, 82)) {
           notice.drawText(line, { x: 54, y: noticeY, size: 9.5, font: regular }); noticeY -= 14;
         }
       }
