@@ -65,7 +65,9 @@ workflow uses Node 24 and updates npm before publishing.
 
 1. Update package versions intentionally.
    The `developer-v<version>` tag must match all four package versions or the workflow stops
-   before signing or publishing.
+   before signing or publishing. Release tags currently accept only the stable
+   `developer-vX.Y.Z` form. Prerelease tags are rejected rather than published under npm's
+   default `latest` channel.
 2. Run `pnpm run build:sdk`, `pnpm -r typecheck` and `pnpm -r test`.
 3. Run `pnpm run release:check` and review all four generated archives.
 4. Merge the reviewed change into the public repository.

@@ -12,11 +12,11 @@ const packages = [
 ];
 const releaseTag = process.env.TRACEPACK_RELEASE_TAG;
 const releaseTagMatch = releaseTag?.match(
-  /^developer-v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/,
+  /^developer-v(\d+\.\d+\.\d+)$/,
 );
 
 if (releaseTag && !releaseTagMatch) {
-  fail(`release tag ${releaseTag} must use developer-v<version>`);
+  fail(`release tag ${releaseTag} must use the stable form developer-vX.Y.Z`);
 }
 
 const expectedVersion = releaseTagMatch?.[1] ?? JSON.parse(

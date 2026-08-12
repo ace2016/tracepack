@@ -399,6 +399,24 @@ export async function buildEvidencePack(project: TracepackProject, files: Map<st
   if (invalidPdfRegions.length > 0) {
     throw new Error(`Choose a PDF page for ${invalidPdfRegions.length} manual redaction${invalidPdfRegions.length === 1 ? "" : "s"} before export.`);
   }
+  for (const item of project.evidence.filter((entry) => entry.reviewStatus !== "excluded" && entry.sourceType === "pdf")) {
+    const manualRemovals = (item.manualRedactions ?? []).filter((region) => region.kind === "pdf-region" && region.decision === "remove");
+    const blob = files.get(item.id);
+    if (manualRemovals.length === 0 || !blob) continue;
+    let source: PDFDocument;
+    try {
+      source = await PDFDocument.load(await blob.arrayBuffer(), { ignoreEncryption: true });
+    } catch {
+      // Unreadable PDFs are handled later with a visible omission page. The range check can
+      // only be performed when the source document itself can be opened.
+      continue;
+    }
+    const pageCount = source.getPageCount();
+    const outsideDocument = manualRemovals.filter((region) => (region.pageNumber ?? 0) > pageCount);
+    if (outsideDocument.length > 0) {
+      throw new Error(`A manual PDF redaction targets a page outside the ${pageCount}-page document.`);
+    }
+  }
   const unresolvedManual = project.evidence.filter((item) => item.reviewStatus !== "excluded").flatMap((item) => item.manualRedactions ?? []).filter((region) => region.decision === "unreviewed");
   if (unresolvedManual.length > 0) throw new Error(`Review ${unresolvedManual.length} manual image redaction${unresolvedManual.length === 1 ? "" : "s"} before export.`);
   const output = await PDFDocument.create(); const regular = await output.embedFont(StandardFonts.Helvetica); const bold = await output.embedFont(StandardFonts.HelveticaBold);

@@ -61,6 +61,22 @@ describe("manual image redaction export gate", () => {
     await expect(buildEvidencePack(project, new Map())).rejects.toThrow("Choose a PDF page for 1 manual redaction before export");
   });
 
+  it("rejects a manual PDF removal targeting a page outside the document", async () => {
+    const source = await PDFDocument.create();
+    source.addPage([300, 400]);
+    const sourceBytes = await source.save();
+    const sourceBlob = new Blob([sourceBytes.slice().buffer as ArrayBuffer], { type: "application/pdf" });
+    const project = projectWithManualDecision("remove");
+    project.evidence[0] = {
+      ...project.evidence[0]!,
+      sourceType: "pdf",
+      mimeType: "application/pdf",
+      manualRedactions: [{ id: "pdf-region-2", kind: "pdf-region", pageNumber: 2, x: .1, y: .2, width: .3, height: .1, decision: "remove", createdAt: "2026-08-10T00:00:00.000Z" }],
+    };
+
+    await expect(buildEvidencePack(project, new Map([["image-1", sourceBlob]]))).rejects.toThrow("outside the 1-page document");
+  });
+
   it("passes an approved manual PDF selection to the secure page rasterizer", async () => {
     const source = await PDFDocument.create();
     source.addPage([300, 400]);
