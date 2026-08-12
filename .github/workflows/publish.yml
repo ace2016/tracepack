@@ -28,7 +28,6 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
       - name: Use a trusted publishing capable npm client
@@ -93,11 +92,6 @@ jobs:
           if-no-files-found: error
 
       - name: Publish with npm provenance
-        env:
-          # The first release uses a short lived granular token because npm cannot attach a
-          # trusted publisher to a package that does not exist yet. Delete this secret after
-          # trusted publishing is configured for all four packages.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           for package in \
             release-packages/tracepack-evidence-core-*.tgz \

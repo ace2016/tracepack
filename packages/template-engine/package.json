@@ -1,6 +1,6 @@
 {
   "name": "@tracepack/template-engine",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Loads and validates Tracepack template.yaml definitions into a TemplateSnapshot — the same schema, the same validation, whether a template ships as a file or is built at runtime by a user.",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/ace2016/tracepack.git", "directory": "packages/template-engine" },
