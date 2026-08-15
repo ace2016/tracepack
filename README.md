@@ -110,10 +110,6 @@ pnpm -r typecheck
 pnpm -r test
 ```
 
-See [`apps/extension/e2e/CHROME_EDGE_CHECKLIST.md`](apps/extension/e2e/CHROME_EDGE_CHECKLIST.md)
-for what still needs manual verification on a real browser before a release; the automated
-`e2e` script covers the detect-review-redact-export journey, not toolbar interaction.
-
 ## Contributing
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md).
