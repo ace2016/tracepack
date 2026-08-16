@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "developer-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing developer release tag to recover"
+        required: true
+        default: "developer-v0.2.0"
 
 concurrency:
   group: tracepack-developer-release
@@ -18,16 +24,20 @@ jobs:
     if: github.repository == 'ace2016/tracepack'
     runs-on: ubuntu-latest
     environment: npm-production
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ env.RELEASE_TAG }}
 
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+          registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
       - name: Use a trusted publishing capable npm client
@@ -38,7 +48,7 @@ jobs:
 
       - name: Verify source, tests and package metadata
         env:
-          TRACEPACK_RELEASE_TAG: ${{ github.ref_name }}
+          TRACEPACK_RELEASE_TAG: ${{ env.RELEASE_TAG }}
         run: pnpm run release:check
 
       - name: Create the reviewed package archives
@@ -67,7 +77,7 @@ jobs:
 
       - name: Sign and verify each archive with Sigstore
         env:
-          CERTIFICATE_IDENTITY: https://github.com/ace2016/tracepack/.github/workflows/publish.yml@${{ github.ref }}
+          CERTIFICATE_IDENTITY: https://github.com/${{ github.workflow_ref }}
           CERTIFICATE_ISSUER: https://token.actions.githubusercontent.com
         run: |
           for package in release-packages/*.tgz; do
@@ -86,7 +96,7 @@ jobs:
       - name: Preserve signed archives before publication
         uses: actions/upload-artifact@v4
         with:
-          name: tracepack-developer-packages-${{ github.ref_name }}
+          name: tracepack-developer-packages-${{ env.RELEASE_TAG }}
           path: |
             release-packages/*.tgz
             release-packages/*.sigstore.json
@@ -104,16 +114,24 @@ jobs:
             release-packages/tracepack-integration-*.tgz \
             release-packages/tracepack-cli-*.tgz
           do
-            npm publish "./$package" --access public --provenance
+            metadata=$(tar -xOzf "./$package" package/package.json)
+            package_name=$(printf '%s' "$metadata" | node -e "let s='' ; process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).name))")
+            package_version=$(printf '%s' "$metadata" | node -e "let s='' ; process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).version))")
+
+            if npm view "${package_name}@${package_version}" version >/dev/null 2>&1; then
+              echo "Already published: ${package_name}@${package_version}. Skipping."
+            else
+              npm publish "./$package" --access public --provenance
+            fi
           done
 
       - name: Attach the verified files to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || \
-            gh release create "$GITHUB_REF_NAME" --verify-tag --title "Tracepack developer packages $GITHUB_REF_NAME" --generate-notes
-          gh release upload "$GITHUB_REF_NAME" --clobber \
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" --verify-tag --title "Tracepack developer packages $RELEASE_TAG" --generate-notes
+          gh release upload "$RELEASE_TAG" --clobber \
             release-packages/*.tgz \
             release-packages/*.sigstore.json \
             release-packages/SHA256SUMS
