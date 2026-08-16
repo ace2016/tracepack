@@ -4,13 +4,7 @@ on:
   push:
     tags:
       - "developer-v*"
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: "Existing developer release tag to recover"
-        required: true
-        default: "developer-v0.2.0"
-        type: string
+
   workflow_dispatch:
     inputs:
       release_tag:
