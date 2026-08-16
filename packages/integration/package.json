@@ -1,6 +1,6 @@
 {
     "name":  "@tracepack/integration",
-    "version":  "0.2.0",
+    "version":  "0.2.1",
     "description":  "Browser and TypeScript helpers for deliberate Send to TracePack handoffs from external evidence producers into a local TracePack workspace.",
     "license":  "Apache-2.0",
     "repository":  {
