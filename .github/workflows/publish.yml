@@ -47,6 +47,7 @@ jobs:
           pnpm --filter @tracepack/evidence-core pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
           pnpm --filter @tracepack/template-engine pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
           pnpm --filter @tracepack/evidence-sdk pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/integration pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
           pnpm --filter @tracepack/cli pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
 
       - name: Test the archives in a clean project
@@ -57,8 +58,9 @@ jobs:
           npm install ../release-packages/tracepack-evidence-core-*.tgz \
             ../release-packages/tracepack-template-engine-*.tgz \
             ../release-packages/tracepack-evidence-sdk-*.tgz \
+            ../release-packages/tracepack-integration-*.tgz \
             ../release-packages/tracepack-cli-*.tgz
-          node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk')]).then(() => console.log('SDK imports passed'))"
+          node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk'), import('@tracepack/integration')]).then(() => console.log('SDK imports passed'))"
           ./node_modules/.bin/tracepack --help
 
       - uses: sigstore/cosign-installer@v3.10.0
@@ -97,6 +99,7 @@ jobs:
             release-packages/tracepack-evidence-core-*.tgz \
             release-packages/tracepack-template-engine-*.tgz \
             release-packages/tracepack-evidence-sdk-*.tgz \
+            release-packages/tracepack-integration-*.tgz \
             release-packages/tracepack-cli-*.tgz
           do
             npm publish "./$package" --access public --provenance

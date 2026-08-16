@@ -8,6 +8,7 @@ const packages = [
   "evidence-core",
   "template-engine",
   "evidence-sdk",
+  "integration",
   "cli",
 ];
 const releaseTag = process.env.TRACEPACK_RELEASE_TAG;

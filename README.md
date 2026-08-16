@@ -83,6 +83,26 @@ examples/
                                        implementable by someone who's never seen this repo
 ```
 
+## Developer packages
+
+The developer-v0.2.0 release publishes the TracePack developer package set to npm:
+
+```sh
+npm install @tracepack/evidence-core
+npm install @tracepack/evidence-sdk
+npm install @tracepack/template-engine
+npm install @tracepack/integration
+npm install -g @tracepack/cli
+```
+
+- `@tracepack/evidence-core` provides the portable evidence domain model.
+- `@tracepack/evidence-sdk` provides the tracepack-evidence v1 types, validation, canonicalisation and hashing helpers.
+- `@tracepack/template-engine` loads and validates TracePack templates.
+- `@tracepack/integration` provides browser and TypeScript helpers for deliberate Send to TracePack handoffs.
+- `@tracepack/cli` validates templates and evidence payloads and compares exported manifests.
+
+The packages are released together with npm provenance through the verified TracePack developer release workflow.
+
 ## Development
 
 Requires [pnpm](https://pnpm.io).

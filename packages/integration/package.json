@@ -1,0 +1,55 @@
+{
+    "name":  "@tracepack/integration",
+    "version":  "0.2.0",
+    "description":  "Browser and TypeScript helpers for deliberate Send to TracePack handoffs from external evidence producers into a local TracePack workspace.",
+    "license":  "Apache-2.0",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "git+https://github.com/ace2016/tracepack.git",
+                       "directory":  "packages/integration"
+                   },
+    "homepage":  "https://dev.tracepack.org/#integrate",
+    "bugs":  {
+                 "url":  "https://github.com/ace2016/tracepack/issues"
+             },
+    "publishConfig":  {
+                          "access":  "public",
+                          "provenance":  true
+                      },
+    "type":  "module",
+    "main":  "./dist/index.js",
+    "types":  "./dist/index.d.ts",
+    "exports":  {
+                    ".":  {
+                              "types":  "./dist/index.d.ts",
+                              "default":  "./dist/index.js"
+                          },
+                    "./browser":  {
+                                      "types":  "./dist/browser.d.ts",
+                                      "default":  "./dist/browser.js"
+                                  }
+                },
+    "files":  [
+                  "dist",
+                  "README.md"
+              ],
+    "sideEffects":  false,
+    "scripts":  {
+                    "build":  "node scripts/build.mjs \u0026\u0026 tsc -p tsconfig.build.json",
+                    "build:browser":  "node scripts/build-browser.mjs",
+                    "typecheck":  "tsc --noEmit",
+                    "test":  "vitest run",
+                    "prepublishOnly":  "pnpm run build \u0026\u0026 pnpm run test"
+                },
+    "dependencies":  {
+                         "@tracepack/evidence-sdk":  "workspace:^"
+                     },
+    "devDependencies":  {
+                            "typescript":  "^5.9.2",
+                            "vitest":  "^3.2.4",
+                            "esbuild":  "^0.28.1"
+                        },
+    "engines":  {
+                    "node":  "\u003e=18"
+                }
+}

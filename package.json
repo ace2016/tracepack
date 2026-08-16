@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm run build:sdk && pnpm --filter @tracepack/workspace dev",
     "build": "pnpm -r build",
-    "build:sdk": "pnpm --filter @tracepack/evidence-core --filter @tracepack/template-engine --filter @tracepack/evidence-sdk build",
+    "build:sdk": "pnpm --filter @tracepack/evidence-core --filter @tracepack/template-engine --filter @tracepack/evidence-sdk --filter @tracepack/integration build",
     "postinstall": "pnpm run build:sdk",
     "release:check": "node scripts/release-check.mjs",
     "test": "pnpm -r test",

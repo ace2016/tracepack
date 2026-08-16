@@ -1,6 +1,6 @@
 {
   "name": "@tracepack/evidence-core",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Tracepack's core domain model — EvidenceItem, TracepackProject, TemplateSnapshot — and the pure functions that operate on them (progress, category state, chronology gaps). No framework or runtime dependency.",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/ace2016/tracepack.git", "directory": "packages/evidence-core" },

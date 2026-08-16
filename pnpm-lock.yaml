@@ -302,6 +302,22 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.13.3)(yaml@2.9.0)
 
+  packages/integration:
+    dependencies:
+      '@tracepack/evidence-sdk':
+        specifier: workspace:^
+        version: link:../evidence-sdk
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.7(@types/node@24.13.3)(yaml@2.9.0)
+
   packages/storage:
     dependencies:
       '@tracepack/evidence-core':
