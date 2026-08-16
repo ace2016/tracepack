@@ -94,6 +94,8 @@ jobs:
           if-no-files-found: error
 
       - name: Publish with npm provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
         run: |
           for package in \
             release-packages/tracepack-evidence-core-*.tgz \
