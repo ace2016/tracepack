@@ -21,7 +21,7 @@ website, documentation, developer website, and support contact.
 - Company number: 17200525
 - ICO reference: ZC140295
 - Registered address: 71 to 75 Shelton Street, Covent Garden, London, WC2H 9JQ
-- Privacy contact: imconcerned@spendmita.com
+- Privacy contact: hello@spendmita.com
 
 ## 2. Evidence in your local workspace
 
@@ -86,7 +86,7 @@ restriction, portability, and objection. Where processing relies on consent, you
 it. These rights apply to information SPENDMITA LTD actually holds. We cannot access or delete
 evidence that exists only in your browser.
 
-Contact imconcerned@spendmita.com to make a request. You may also complain to the Information
+Contact hello@spendmita.com to make a request. You may also complain to the Information
 Commissioner's Office at [ico.org.uk](https://ico.org.uk).
 
 ## 10. Children
@@ -104,5 +104,5 @@ notice before launch.
 ## 12. Changes and contact
 
 We will update this notice when Tracepack's processing changes and show a new date at the top.
-For privacy questions, email imconcerned@spendmita.com or write to Data Protection, SPENDMITA
+For privacy questions, email hello@spendmita.com or write to Data Protection, SPENDMITA
 LTD, 71 to 75 Shelton Street, Covent Garden, London, WC2H 9JQ.
