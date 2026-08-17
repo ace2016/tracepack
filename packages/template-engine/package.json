@@ -20,6 +20,6 @@
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": { "@tracepack/evidence-core": "workspace:*", "yaml": "^2.8.1", "zod": "^4.1.5" },
-  "devDependencies": { "esbuild": "^0.28.1", "typescript": "^5.9.2", "vitest": "^3.2.4" },
+  "devDependencies": { "esbuild": "^0.28.2", "typescript": "^7.0.2", "vitest": "^4.1.10" },
   "engines": { "node": ">=18" }
 }
