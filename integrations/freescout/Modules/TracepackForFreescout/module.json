@@ -1,0 +1,13 @@
+{
+    "name": "TracepackForFreescout",
+    "alias": "tracepackforfreescout",
+    "description": "Unofficial, community-built integration. Not affiliated with or endorsed by FreeScout. Adds a \"Send to Tracepack for FreeScout\" button to each conversation. Builds a tracepack-evidence v1 payload server-side from the conversation's thread and attachments, then hands it to the agent's browser to forward directly to the customer's own Tracepack tab via postMessage. No Tracepack account, no server-to-server call, and no data leaves the agent's own browser except the handoff the agent explicitly triggers.",
+    "keywords": ["tracepack", "evidence", "export"],
+    "active": 1,
+    "order": 0,
+    "providers": [
+        "Modules\\TracepackForFreescout\\Providers\\TracepackForFreescoutServiceProvider"
+    ],
+    "aliases": {},
+    "files": []
+}
