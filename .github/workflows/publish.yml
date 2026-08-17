@@ -95,7 +95,7 @@ jobs:
         run: sha256sum *.tgz *.sigstore.json > SHA256SUMS
 
       - name: Preserve signed archives before publication
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tracepack-developer-packages-${{ env.RELEASE_TAG }}
           path: |
