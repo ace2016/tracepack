@@ -74,7 +74,7 @@ jobs:
           node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk'), import('@tracepack/integration')]).then(() => console.log('SDK imports passed'))"
           ./node_modules/.bin/tracepack --help
 
-      - uses: sigstore/cosign-installer@v3.10.0
+      - uses: sigstore/cosign-installer@v4.1.2
 
       - name: Sign and verify each archive with Sigstore
         env:
