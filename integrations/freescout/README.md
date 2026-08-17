@@ -90,21 +90,21 @@ string, and therefore a different hash, than the JS side for any payload contain
 with `JSON_UNESCAPED_SLASHES`.)
 
 That's the part of this module that's genuinely proven correct: the interchange contract
-implementation. What's **not** verified is the FreeScout integration surface. The controller,
-routes, service provider, and blade view were written against FreeScout's publicly documented
-model and module API, not confirmed against a live install. Before using this for real:
+implementation. The FreeScout integration surface has also been exercised end to end against a
+staging FreeScout installation — the button renders via the `conversation.append_action_buttons`
+Eventy hook in `TracepackForFreescoutServiceProvider::boot()`, and a real conversation's handoff
+through to Tracepack's import screen completes successfully. FreeScout's model API can still
+change between releases, so before relying on this against your own install:
 
 - Confirm `App\Conversation`, `App\Attachment`, and the `Thread` relation's field/method names
   (`created_by_customer`, `createdByUser`, `getContent()`, `body`, `customer_email`, `url()`)
-  against your installed FreeScout version, since these can and do change between releases.
-- Confirm the Eventy hook name in `TracepackForFreescoutServiceProvider::boot()`
-  (`conversation.append_action_buttons`). It follows the naming pattern FreeScout's other
-  module hooks use, but has not been confirmed against a running instance. If the button
-  doesn't appear on a conversation after installing, this is the first thing to check: search
-  your FreeScout version's `resources/views/conversations/` partials for the actual
-  `Eventy::addFilter`/`addAction` calls already firing there. The route itself
+  against your installed FreeScout version.
+- If the button doesn't appear on a conversation after installing, check whether your FreeScout
+  version still fires `conversation.append_action_buttons`: search your version's
+  `resources/views/conversations/` partials for the actual `Eventy::addFilter`/`addAction`
+  calls firing there. The route itself
   (`GET conversations/conversation/{id}/send-to-tracepack-payload`) works regardless of whether
-  the hook fires, so linking to it manually is a working fallback while you confirm the hook.
+  the hook fires, so linking to it manually is a working fallback.
 
 ## Installing
 
