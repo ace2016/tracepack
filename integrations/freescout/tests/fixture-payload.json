@@ -1,0 +1,67 @@
+{
+    "schema_version": 1,
+    "source": {
+        "producer_id": "org.freescout.send-to-tracepack",
+        "producer_name": "Example Helpdesk (FreeScout)",
+        "producer_version": "0.1.0"
+    },
+    "capture_timestamp": "2026-08-01T10:05:00Z",
+    "source_url": "https://helpdesk.example.com/conversation/482",
+    "evidence_type": "support_conversation",
+    "attachments": [
+        {
+            "id": "att-1",
+            "filename": "delivery-report.pdf",
+            "mime_type": "application/pdf",
+            "size": 49,
+            "content_hash": "458ab93893031e7cb106aa5e1630f5713ef6550b110af001ab244d33f00cb9c8",
+            "encoding": "base64",
+            "data": "JVBERi0xLjQKJWZha2UgcGRmIGJ5dGVzIGZvciBhIHRlc3QgZml4dHVyZQolJUVPRg=="
+        }
+    ],
+    "observations": [
+        {
+            "id": "obs-1",
+            "kind": "support_conversation_summary",
+            "label": "Support conversation summary",
+            "detail": "Order #4821 arrived damaged. Customer: customer@example.com. 2 messages in this thread.",
+            "confidence": 1
+        },
+        {
+            "id": "obs-2",
+            "kind": "support_message",
+            "label": "Message from customer@example.com",
+            "detail": "The mug arrived cracked in transit, I would like a refund.",
+            "confidence": 1,
+            "data": {
+                "sent_at": "2026-08-01T09:12:00Z"
+            }
+        },
+        {
+            "id": "obs-3",
+            "kind": "support_message",
+            "label": "Message from Agent Jordan",
+            "detail": "Sorry to hear that. I have attached the delivery photo the courier logged and requested a refund on our end.",
+            "confidence": 1,
+            "data": {
+                "sent_at": "2026-08-01T10:03:00Z"
+            }
+        },
+        {
+            "id": "obs-4",
+            "kind": "unsupported_attachment",
+            "label": "Attachments not included",
+            "detail": "This conversation had 1 attachment Tracepack's v1 schema does not accept as evidence files (only PDF, JPEG, PNG and WebP are supported): internal-note.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document). Add them to the pack manually if they matter.",
+            "confidence": 1
+        }
+    ],
+    "integrity": {
+        "algorithm": "sha256",
+        "canonicalization": "RFC8785",
+        "payload_hash": "c9ed213a591b3506a228d0c1c426751e15dc7b56d560d35694fc7d8c820a99df"
+    },
+    "metadata": {
+        "subject": "Order #4821 arrived damaged",
+        "external_reference": "Conversation #1842"
+    }
+}

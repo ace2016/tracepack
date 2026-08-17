@@ -1,0 +1,27 @@
+{
+    "name": "tracepack/tracepack-for-freescout",
+    "description": "Unofficial, community-built FreeScout module: builds a tracepack-evidence v1 payload from a conversation and hands it to the customer's own Tracepack tab. Not affiliated with or endorsed by FreeScout.",
+    "type": "freescout-module",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Tracepack",
+            "homepage": "https://tracepack.org"
+        }
+    ],
+    "require": {
+        "php": "^8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\TracepackForFreescout\\": ""
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Modules\\TracepackForFreescout\\Providers\\TracepackForFreescoutServiceProvider"
+            ]
+        }
+    }
+}

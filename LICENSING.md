@@ -25,8 +25,15 @@ terms. See `packages/evidence-interchange/PRODUCER_GUIDE.md` and
 **GNU Affero General Public License v3.0 (AGPLv3)** covers everything else: the actual
 product. That means `apps/workspace`, `apps/extension`, `apps/website`, `apps/developer`,
 `packages/evidence-interchange`, `packages/document-engine`, `packages/export-engine`,
-`packages/storage`, and `templates/`. The root `LICENSE` file holds this text and is the
-default for the repository; anything not listed above under Apache-2.0 is AGPLv3.
+`packages/storage`, `templates/`, and `integrations/`. The root `LICENSE` file holds this text
+and is the default for the repository; anything not listed above under Apache-2.0 is AGPLv3.
+
+`integrations/` holds real, installable connectors to third-party platforms, as opposed to
+`examples/`, which are reference implementations of the interchange format itself. Some of
+these platforms carry their own licensing requirements that flow into the connector; see the
+connector's own directory for specifics (`integrations/freescout/README.md`, for example, notes
+that FreeScout's own AGPLv3 licence is why that connector is AGPLv3 rather than something more
+permissive).
 
 ## What AGPLv3 actually means here
 
@@ -80,4 +87,5 @@ licensing only works if the project actually holds the rights needed to relicens
 | `packages/export-engine` | AGPLv3 |
 | `packages/storage` | AGPLv3 |
 | `templates/` | AGPLv3 |
+| `integrations/` | AGPLv3 |
 | everything else | AGPLv3 (the repository default) |

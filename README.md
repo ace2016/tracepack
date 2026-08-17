@@ -81,6 +81,10 @@ examples/
                                        producer, built with zero imports from Tracepack's own
                                        code: proof the interchange contract is genuinely
                                        implementable by someone who's never seen this repo
+integrations/
+  freescout/   a real, installable FreeScout module: adds a Send to Tracepack button to each
+               conversation. Unofficial, community-built, not endorsed by FreeScout -- see
+               integrations/freescout/README.md
 ```
 
 ## Developer packages
