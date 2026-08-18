@@ -55,7 +55,6 @@ sync. See [`SECURITY.md`](SECURITY.md) for the full trust model.
 apps/
   workspace/    the web app (React + Vite) -- deployed at app.tracepack.org
   extension/    the browser extension (loads the workspace app + adds page capture)
-  website/      marketing site -- deployed at tracepack.org
   developer/    developer landing page (CLI/SDK/format) -- deployed at dev.tracepack.org
 packages/
   evidence-core/          domain model (projects, evidence items, categories) -- built to
