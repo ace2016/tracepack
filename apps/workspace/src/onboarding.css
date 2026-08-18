@@ -1,4 +1,4 @@
-/* apps/workspace's own onboarding -- intentionally not apps/website/src/onboarding.css.
+/* apps/workspace's own onboarding -- Workspace-specific onboarding styles.
    Same colour tokens as the rest of this app's styles.css (it's the same product), but a much
    smaller, quieter treatment: no full-scene illustrations, no page-turn animation between
    steps. This is a short orientation for someone already inside the tool, not a pitch. */

@@ -4,7 +4,7 @@ export interface OnboardingProps {
   onFinish: () => void;
 }
 
-// Deliberately a separate component from apps/website/src/Onboarding.tsx, not a shared one --
+// Workspace-specific onboarding component.
 // that one is a marketing pitch aimed at a visitor deciding whether to try the product at all
 // ("no account, no upload"). This one is a short orientation for someone who has already
 // landed in the real, working app: three things worth knowing before they start, not a sales

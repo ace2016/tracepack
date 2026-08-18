@@ -23,7 +23,7 @@ terms. See `packages/evidence-interchange/PRODUCER_GUIDE.md` and
 `examples/producers/consumer-rights-helper/` for what that promise is meant to enable.
 
 **GNU Affero General Public License v3.0 (AGPLv3)** covers everything else: the actual
-product. That means `apps/workspace`, `apps/extension`, `apps/website`, `apps/developer`,
+product. That means `apps/workspace`, `apps/extension`, `apps/developer`,
 `packages/evidence-interchange`, `packages/document-engine`, `packages/export-engine`,
 `packages/storage`, `templates/`, and `integrations/`. The root `LICENSE` file holds this text
 and is the default for the repository; anything not listed above under Apache-2.0 is AGPLv3.
@@ -80,7 +80,6 @@ licensing only works if the project actually holds the rights needed to relicens
 | `examples/` | Apache-2.0 |
 | `apps/workspace` | AGPLv3 |
 | `apps/extension` | AGPLv3 |
-| `apps/website` | AGPLv3 |
 | `apps/developer` | AGPLv3 |
 | `packages/evidence-interchange` | AGPLv3 |
 | `packages/document-engine` | AGPLv3 |
