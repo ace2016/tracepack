@@ -95,6 +95,40 @@ window.addEventListener("message", (event) => {
 `imported` is best-effort -- if the customer just closes the tab without ever picking a pack,
 you'll never receive it. Don't build anything that assumes it always arrives.
 
+## 3a. Or, use `@tracepack/integration` instead of hand-rolling this
+
+The handshake above is the whole protocol, and hand-rolling it yourself is completely fine. If
+you'd rather not maintain your own `postMessage` listener, timeout handling, and status tracking,
+[`@tracepack/integration`](../integration/README.md) wraps the same handshake behind two
+functions, plus a few extras: explicit origin checks, a unique handoff id per send, protocol
+version negotiation, and structured `accepted`/`rejected`/`cancelled` lifecycle messages instead
+of a single best-effort `imported`.
+
+```js
+import { createTracepackHandoff, startTracepackBrowserHandoff } from "@tracepack/integration";
+
+const handoff = createTracepackHandoff({
+  evidencePayload: payload,
+  context: { purpose: "support_case" },
+});
+
+const session = startTracepackBrowserHandoff({
+  tracepackUrl,
+  targetWindow: tracepackTab, // open this synchronously in your click handler, same as above
+  handoff,
+  onStatus(message) {
+    // message.type: "accepted" | "rejected" | "cancelled"
+  },
+});
+
+const imported = await session.completion; // resolves once Tracepack imports the evidence
+```
+
+Install with `npm install @tracepack/integration`; see its README for the full API. This is the
+protocol Tracepack's own FreeScout integration uses, and new integrations should prefer it going
+forward -- the plain handshake in section 3 above remains supported for existing producers and
+anyone who wants zero dependencies, but isn't where new development is focused.
+
 ## 4. Building the payload
 
 Use [`@tracepack/evidence-sdk`](../evidence-sdk/README.md) -- it has the types, schema
