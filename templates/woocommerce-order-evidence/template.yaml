@@ -1,0 +1,74 @@
+id: woocommerce-order-evidence
+name: WooCommerce order evidence
+version: 0.1.0
+jurisdiction: general
+intake:
+  summary_label: What is this order record for?
+  summary_placeholder: "For example: chargeback, refund dispute, delivery issue, customer complaint, audit or internal review."
+  resolution_label: What outcome or next step do you need?
+  resolution_placeholder: "For example: challenge a chargeback, confirm a refund, document delivery, or preserve the order record."
+categories:
+  - id: order_record
+    name: Order record
+    requirement: required
+    description: The core WooCommerce order record showing what was ordered, when, quantities, prices, totals and current order status.
+    accepted_types: [pdf, image, webpage, note]
+  - id: payment_transaction
+    name: Payment and transaction record
+    requirement: recommended
+    description: Payment method, transaction references, payment state, authorisation or capture information relevant to the order.
+    accepted_types: [pdf, image, webpage, note]
+  - id: fulfilment_delivery
+    name: Fulfilment and delivery
+    requirement: recommended
+    description: Shipping, fulfilment, tracking, collection, delivery confirmation or other records showing how the order was supplied.
+    accepted_types: [pdf, image, webpage, note]
+  - id: refunds_returns
+    name: Refunds and returns
+    requirement: optional
+    description: Refund amounts, dates, reasons, return records, replacement records or evidence that a refund was processed.
+    accepted_types: [pdf, image, webpage, note]
+  - id: customer_communication
+    name: Customer communication
+    requirement: optional
+    description: Relevant messages, emails, order notes or other communication about the order, delivery, return, refund or dispute.
+    accepted_types: [pdf, image, webpage, note]
+    role: correspondence
+  - id: product_terms
+    name: Product details and applicable terms
+    requirement: optional
+    description: Product descriptions, listing details, refund or return policies, warranty terms, cancellation terms or other conditions relevant to the order.
+    accepted_types: [pdf, image, webpage, note]
+  - id: digital_service_access
+    name: Digital access or service delivery
+    requirement: optional
+    description: Evidence that a digital product, download, subscription or service was provisioned, accessed or used.
+    accepted_types: [pdf, image, webpage, note]
+  - id: problem_evidence
+    name: Problem evidence
+    requirement: optional
+    description: Photos, screenshots, reports or notes showing damage, non-delivery, an incorrect item, a service issue or another disputed problem.
+    accepted_types: [pdf, image, webpage, note]
+  - id: supporting_evidence
+    name: Supporting evidence
+    requirement: optional
+    description: Any other material that helps explain the order or the issue being reviewed.
+    accepted_types: [pdf, image, webpage, note]
+guidance:
+  - category_id: order_record
+    text: Start with the order itself. Keep the order number, date, line items, quantities, prices, totals and status together so the transaction can be understood without relying on another system.
+  - category_id: payment_transaction
+    text: Include only payment information needed to explain the transaction. Do not add full payment-card details, credentials or other secrets.
+  - category_id: fulfilment_delivery
+    text: For physical goods, include available dispatch dates, carrier details, tracking references, shipping labels or delivery confirmation. For collection, keep the collection record if one exists.
+  - category_id: refunds_returns
+    text: If a refund or return happened, keep both the WooCommerce record and any supporting gateway, return or replacement evidence that explains what was actually done.
+  - category_id: customer_communication
+    text: Keep communication that changes or explains the order, delivery, refund, return or dispute. Review personal information before sharing a pack.
+  - category_id: product_terms
+    text: Preserve the product description and the terms that applied at the relevant time when they matter to the issue, rather than relying only on a page that may later change.
+  - category_id: digital_service_access
+    text: For digital goods or services, keep access, download, account or service-delivery records only where they are relevant and appropriate to include.
+  - category_id: problem_evidence
+    text: Add evidence of the specific problem when one exists, such as damage, an incorrect item, failed delivery or a product or service not matching its description.
+export_sections: [cover, general_summary, evidence_checklist, timeline, evidence_index, evidence_documents, source_manifest]

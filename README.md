@@ -73,18 +73,37 @@ packages/
                            and diffs two exported manifest.json files, from the command line,
                            outside the browser
 templates/
-  consumer-complaint/, provenance-trace/, general/   the templates that ship today -- see
-                                                      templates/CONTRIBUTING.md to add another
+  consumer-complaint/, provenance-trace/, general/   general-purpose templates that ship today
+  woocommerce-order-evidence/                        WooCommerce order evidence template
+  See templates/CONTRIBUTING.md to add another template
 examples/
   producers/consumer-rights-helper/   a worked example of an independent tracepack-evidence
                                        producer, built with zero imports from Tracepack's own
                                        code: proof the interchange contract is genuinely
                                        implementable by someone who's never seen this repo
 integrations/
-  freescout/   a real, installable FreeScout module: adds a Send to Tracepack button to each
-               conversation. Unofficial, community-built, not endorsed by FreeScout -- see
-               integrations/freescout/README.md
+  freescout/     installable FreeScout module for deliberate conversation handoff to Tracepack
+  woocommerce/   WooCommerce plugin for portable order evidence and Tracepack review
 ```
+
+## Integrations
+
+Tracepack integrations let external tools prepare structured evidence and hand it to the user through the `tracepack-evidence` v1 contract.
+
+Nothing is silently added to a pack. The user reviews and confirms every handoff.
+
+### WooCommerce
+
+[`integrations/woocommerce/`](integrations/woocommerce/) creates a portable evidence record from a WooCommerce order and opens it in Tracepack for review.
+
+Version 0.1.0 excludes customer email, phone, billing and shipping addresses, payment-card details, credentials, secrets and arbitrary order metadata.
+
+The integration suggests the [`woocommerce-order-evidence`](templates/woocommerce-order-evidence/) template, while the user remains in control of the final import decision.
+
+### FreeScout
+
+[`integrations/freescout/`](integrations/freescout/) adds a deliberate Send to Tracepack action to a FreeScout conversation while preserving source attribution.
+
 
 ## Developer packages
 
