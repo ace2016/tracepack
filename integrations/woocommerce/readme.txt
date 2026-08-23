@@ -1,5 +1,5 @@
 === TracePack for WooCommerce ===
-Contributors: ace2016
+Contributors: ace202
 Tags: woocommerce, evidence, orders, disputes, records
 Requires at least: 6.5
 Tested up to: 7.0
@@ -67,9 +67,6 @@ https://tracepack.org/
 
 Privacy information:
 https://tracepack.org/privacy
-
-Terms:
-https://tracepack.org/terms
 
 == Installation ==
 
