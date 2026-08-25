@@ -1,0 +1,132 @@
+name: Generate attestation fixture
+
+on:
+  pull_request:
+    paths:
+      - "packages/attestation/**"
+      - "packages/attestation-sigstore/**"
+      - ".github/workflows/generate-attestation-fixture.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate real Sigstore fixture
+        working-directory: packages/attestation-sigstore
+        run: |
+          mkdir -p fixture-output
+
+          cat > fixture-output/payload.txt <<'PAYLOAD'
+          tracepack-attestation-sigstore-fixture-v1
+          PAYLOAD
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { sign } from "sigstore";
+
+          const payloadPath =
+            "fixture-output/payload.txt";
+
+          const bundlePath =
+            "fixture-output/payload.sigstore.json";
+
+          const payload =
+            fs.readFileSync(payloadPath);
+
+          const bundle =
+            await sign(payload, {
+              tlogUpload: true,
+            });
+
+          fs.writeFileSync(
+            bundlePath,
+            JSON.stringify(
+              bundle,
+              null,
+              2,
+            ),
+          );
+
+          console.log(
+            JSON.stringify(
+              {
+                mediaType:
+                  bundle.mediaType,
+                keys:
+                  Object.keys(bundle),
+              },
+              null,
+              2,
+            ),
+          );
+          NODE
+
+      - name: Verify fixture and inspect identity
+        working-directory: packages/attestation-sigstore
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { verify } from "sigstore";
+
+          const payload =
+            fs.readFileSync(
+              "fixture-output/payload.txt",
+            );
+
+          const bundle =
+            JSON.parse(
+              fs.readFileSync(
+                "fixture-output/payload.sigstore.json",
+                "utf8",
+              ),
+            );
+
+          const signer =
+            await verify(
+              bundle,
+              payload,
+            );
+
+          console.log(
+            "VERIFIED_SIGSTORE_IDENTITY",
+          );
+
+          console.log(
+            JSON.stringify(
+              signer.identity,
+              null,
+              2,
+            ),
+          );
+          NODE
+
+      - name: Upload fixture
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracepack-attestation-sigstore-fixture
+          path: |
+            packages/attestation-sigstore/fixture-output/payload.txt
+            packages/attestation-sigstore/fixture-output/payload.sigstore.json
+          if-no-files-found: error
+          retention-days: 7
