@@ -116,7 +116,7 @@ function markCryptographicFailure(
 }
 
 type DetectedBundleFormat =
-  | "sigstore-v0.3"
+  | "sigstore-json"
   | "cosign-legacy"
   | "unknown";
 
@@ -127,7 +127,7 @@ function detectBundleFormat(
     typeof value.mediaType === "string" &&
     value.mediaType.length > 0
   ) {
-    return "sigstore-v0.3";
+    return "sigstore-json";
   }
 
   if (
@@ -151,7 +151,7 @@ function parseBundle(
 
   if (format === "cosign-legacy") {
     throw new Error(
-      "Legacy Cosign bundle detected. This adapter currently accepts Sigstore v0.3 serialized bundles only.",
+      "Legacy Cosign bundle detected. This adapter currently accepts Sigstore serialized JSON bundles only.",
     );
   }
 

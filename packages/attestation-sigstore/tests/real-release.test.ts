@@ -1,8 +1,4 @@
 import {
-  readFileSync,
-} from "node:fs";
-
-import {
   describe,
   expect,
   it,
@@ -13,33 +9,40 @@ import {
   verifyWithSigstore,
 } from "../src";
 
-const PAYLOAD =
-  "/tmp/tracepack-sigstore-real/tracepack-evidence-core-0.2.1.tgz";
-
-const BUNDLE =
-  "/tmp/tracepack-sigstore-real/tracepack-evidence-core-0.2.1.tgz.sigstore.json";
-
 describe(
-  "existing TracePack release compatibility",
+  "legacy Cosign bundle compatibility",
   () => {
     it(
-      "detects the developer-v0.2.1 release bundle as legacy Cosign format",
+      "detects the legacy Cosign bundle shape before cryptographic verification",
       async () => {
         const payload =
-          readFileSync(PAYLOAD);
-
-        const bundle =
-          JSON.parse(
-            readFileSync(
-              BUNDLE,
-              "utf8",
-            ),
+          new TextEncoder().encode(
+            "legacy-cosign-format-detection",
           );
+
+        const legacyBundle = {
+          base64Signature:
+            "placeholder-signature",
+          cert:
+            "placeholder-certificate",
+          rekorBundle: {
+            SignedEntryTimestamp:
+              "placeholder-set",
+            Payload: {
+              body:
+                "placeholder-body",
+              integratedTime: 1,
+              logIndex: 1,
+              logID:
+                "placeholder-log-id",
+            },
+          },
+        };
 
         try {
           await verifyWithSigstore(
             payload,
-            bundle,
+            legacyBundle,
           );
 
           throw new Error(

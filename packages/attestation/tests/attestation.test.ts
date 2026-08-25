@@ -355,3 +355,116 @@ describe(
     );
   },
 );
+
+describe(
+  "multi-party signer identity uniqueness",
+  () => {
+    it(
+      "does not count one verified identity twice under different party IDs",
+      () => {
+        const subject = {
+          kind:
+            "tracepack-pack" as const,
+          digest: {
+            algorithm:
+              "sha256" as const,
+            value:
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          },
+        };
+
+        const makeResult = (
+          partyId: string,
+        ) => ({
+          valid: true as const,
+          attestation: {
+            statement: {
+              schema_version:
+                "tracepack-attestation/v1" as const,
+              attestation_id:
+                `attestation-${partyId}`,
+              subject,
+              statement: {
+                type:
+                  "pack.approval",
+                text:
+                  "Approved",
+              },
+              signer: {
+                party_id:
+                  partyId,
+                role:
+                  "approver",
+                expected_identity: {
+                  issuer:
+                    "https://issuer.example",
+                  subject:
+                    "https://identity.example/same-signer",
+                },
+              },
+              issued_at:
+                "2026-08-26T00:00:00Z",
+            },
+            signature: {
+              method:
+                "sigstore" as const,
+              content_digest: {
+                algorithm:
+                  "sha256" as const,
+                value:
+                  "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              },
+              bundle_media_type:
+                "application/vnd.dev.sigstore.bundle+json;version=0.2",
+              bundle: {},
+            },
+          },
+          verified_identity: {
+            issuer:
+              "https://issuer.example",
+            subject:
+              "https://identity.example/same-signer",
+          },
+          identity_binding:
+            "matched" as const,
+        });
+
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+              subject,
+              requirements: [
+                {
+                  id:
+                    "two-approvers",
+                  statement_type:
+                    "pack.approval",
+                  role:
+                    "approver",
+                  minimum_signers:
+                    2,
+                  require_identity_binding:
+                    true,
+                },
+              ],
+            },
+            [
+              makeResult("party-a"),
+              makeResult("party-b"),
+            ],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.matched_parties,
+        ).toHaveLength(1);
+      },
+    );
+  },
+);

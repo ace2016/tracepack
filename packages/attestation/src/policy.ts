@@ -23,7 +23,10 @@ export function evaluateAttestationPolicy(
   const requirements =
     policy.requirements.map(
       (requirement) => {
-        const parties = new Set<string>();
+        const parties = new Map<
+          string,
+          string
+        >();
 
         for (
           const result of verificationResults
@@ -67,13 +70,28 @@ export function evaluateAttestationPolicy(
             continue;
           }
 
-          parties.add(
-            statement.signer.party_id,
-          );
+          const verifiedIdentityKey =
+            [
+              result.verified_identity.issuer,
+              result.verified_identity.subject,
+            ].join("\n");
+
+          if (
+            !parties.has(
+              verifiedIdentityKey,
+            )
+          ) {
+            parties.set(
+              verifiedIdentityKey,
+              statement.signer.party_id,
+            );
+          }
         }
 
         const matchedParties =
-          Array.from(parties).sort();
+          Array.from(
+            parties.values(),
+          ).sort();
 
         return {
           requirement_id:

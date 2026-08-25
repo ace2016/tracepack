@@ -4,7 +4,10 @@
   "title": "TracePack Signed Attestation v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["statement", "signature"],
+  "required": [
+    "statement",
+    "signature"
+  ],
   "properties": {
     "statement": {
       "type": "object",
@@ -29,7 +32,10 @@
         "subject": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "digest"],
+          "required": [
+            "kind",
+            "digest"
+          ],
           "properties": {
             "kind": {
               "const": "tracepack-pack"
@@ -39,8 +45,12 @@
             },
             "pack_version": {
               "oneOf": [
-                { "type": "string" },
-                { "type": "integer" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
               ]
             }
           }
@@ -48,12 +58,16 @@
         "statement": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["type", "text"],
+          "required": [
+            "type",
+            "text"
+          ],
           "properties": {
             "type": {
               "type": "string",
               "minLength": 1,
-              "maxLength": 128
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
             },
             "text": {
               "type": "string",
@@ -65,7 +79,9 @@
         "signer": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["party_id"],
+          "required": [
+            "party_id"
+          ],
           "properties": {
             "party_id": {
               "type": "string",
@@ -86,14 +102,21 @@
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "id": { "type": "string" },
-                "name": { "type": "string" }
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
               }
             },
             "expected_identity": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["issuer", "subject"],
+              "required": [
+                "issuer",
+                "subject"
+              ],
               "properties": {
                 "issuer": {
                   "type": "string",
@@ -146,7 +169,10 @@
     "sha256": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["algorithm", "value"],
+      "required": [
+        "algorithm",
+        "value"
+      ],
       "properties": {
         "algorithm": {
           "const": "sha256"
