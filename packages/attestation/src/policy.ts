@@ -31,6 +31,22 @@ export function evaluateAttestationPolicy(
   const requirements =
     policy.requirements.map(
       (requirement) => {
+        if (
+          !Number.isInteger(
+            requirement.minimum_signers,
+          ) ||
+          requirement.minimum_signers < 1
+        ) {
+          return {
+            requirement_id:
+              requirement.id,
+            satisfied: false,
+            required:
+              requirement.minimum_signers,
+            matched_parties: [],
+          };
+        }
+
         const parties = new Map<
           string,
           string

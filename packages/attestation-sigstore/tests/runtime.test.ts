@@ -1,4 +1,13 @@
 import {
+  TUFError,
+  VerificationError,
+} from "sigstore";
+
+import {
+  classifySigstoreFailure,
+} from "../src/verify";
+
+import {
   describe,
   expect,
   it,
@@ -14,6 +23,108 @@ import {
   verifyAttestationWithSigstore,
   verifyWithSigstore,
 } from "../src";
+
+
+describe(
+  "Sigstore verification failure classification",
+  () => {
+    it(
+      "classifies transparency log failures",
+      () => {
+        const error =
+          new VerificationError({
+            code:
+              "TLOG_INCLUSION_PROOF_ERROR",
+            message:
+              "invalid inclusion proof",
+          });
+
+        expect(
+          classifySigstoreFailure(
+            error,
+          ),
+        ).toEqual({
+          stage:
+            "transparency_log",
+          code:
+            "SIGSTORE_TRANSPARENCY_LOG_FAILED",
+        });
+      },
+    );
+
+    it(
+      "classifies certificate failures",
+      () => {
+        const error =
+          new VerificationError({
+            code:
+              "CERTIFICATE_ERROR",
+            message:
+              "invalid certificate",
+          });
+
+        expect(
+          classifySigstoreFailure(
+            error,
+          ),
+        ).toEqual({
+          stage:
+            "certificate",
+          code:
+            "SIGSTORE_CERTIFICATE_FAILED",
+        });
+      },
+    );
+
+    it(
+      "classifies signature failures",
+      () => {
+        const error =
+          new VerificationError({
+            code:
+              "SIGNATURE_ERROR",
+            message:
+              "invalid signature",
+          });
+
+        expect(
+          classifySigstoreFailure(
+            error,
+          ),
+        ).toEqual({
+          stage:
+            "signature",
+          code:
+            "SIGSTORE_SIGNATURE_FAILED",
+        });
+      },
+    );
+
+    it(
+      "classifies timestamp failures",
+      () => {
+        const error =
+          new VerificationError({
+            code:
+              "TIMESTAMP_ERROR",
+            message:
+              "invalid timestamp",
+          });
+
+        expect(
+          classifySigstoreFailure(
+            error,
+          ),
+        ).toEqual({
+          stage:
+            "timestamp",
+          code:
+            "SIGSTORE_TIMESTAMP_FAILED",
+        });
+      },
+    );
+  },
+);
 
 describe(
   "@tracepack/attestation-sigstore",

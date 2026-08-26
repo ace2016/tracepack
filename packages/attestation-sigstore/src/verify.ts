@@ -1,4 +1,8 @@
-import { verify } from "sigstore";
+import {
+  TUFError,
+  VerificationError,
+  verify,
+} from "sigstore";
 
 import type {
   SerializedBundle,
@@ -80,26 +84,126 @@ function markCryptographicSuccess(
   );
 }
 
+type SigstoreFailureStage =
+  | "trusted_root"
+  | "certificate"
+  | "transparency_log"
+  | "timestamp"
+  | "signature";
+
+type ClassifiedSigstoreFailure = {
+  stage: SigstoreFailureStage;
+  code: string;
+};
+
+export function classifySigstoreFailure(
+  error: unknown,
+): ClassifiedSigstoreFailure {
+  if (error instanceof TUFError) {
+    return {
+      stage: "trusted_root",
+      code:
+        "SIGSTORE_TRUST_ROOT_FAILED",
+    };
+  }
+
+  if (error instanceof VerificationError) {
+    if (
+      error.code.startsWith(
+        "TLOG_",
+      )
+    ) {
+      return {
+        stage:
+          "transparency_log",
+        code:
+          "SIGSTORE_TRANSPARENCY_LOG_FAILED",
+      };
+    }
+
+    switch (error.code) {
+      case "CERTIFICATE_ERROR":
+      case "PUBLIC_KEY_ERROR":
+        return {
+          stage: "certificate",
+          code:
+            "SIGSTORE_CERTIFICATE_FAILED",
+        };
+
+      case "TIMESTAMP_ERROR":
+        return {
+          stage: "timestamp",
+          code:
+            "SIGSTORE_TIMESTAMP_FAILED",
+        };
+
+      case "SIGNATURE_ERROR":
+        return {
+          stage: "signature",
+          code:
+            "SIGSTORE_SIGNATURE_FAILED",
+        };
+
+      default:
+        return {
+          stage: "signature",
+          code:
+            "SIGSTORE_VERIFICATION_FAILED",
+        };
+    }
+  }
+
+  return {
+    stage: "signature",
+    code:
+      "SIGSTORE_VERIFICATION_FAILED",
+  };
+}
+
 function markCryptographicFailure(
   report: AttestationVerificationReportV1,
+  error: unknown,
   message: string,
 ): void {
-  setVerificationStage(
-    report,
-    "signature",
-    "failed",
-    {
-      code:
-        "SIGSTORE_VERIFICATION_FAILED",
-      message,
-    },
-  );
+  const failure =
+    classifySigstoreFailure(
+      error,
+    );
 
   for (const stage of [
     "trusted_root",
     "certificate",
     "transparency_log",
     "timestamp",
+    "signature",
+  ] as const) {
+    if (stage === failure.stage) {
+      setVerificationStage(
+        report,
+        stage,
+        "failed",
+        {
+          code:
+            failure.code,
+          message,
+        },
+      );
+
+      continue;
+    }
+
+    setVerificationStage(
+      report,
+      stage,
+      "skipped",
+      {
+        message:
+          `Skipped because Sigstore verification failed at ${failure.stage}.`,
+      },
+    );
+  }
+
+  for (const stage of [
     "identity",
     "policy",
   ] as const) {
@@ -109,7 +213,7 @@ function markCryptographicFailure(
       "skipped",
       {
         message:
-          "Cryptographic verification did not complete.",
+          "Skipped because Sigstore verification did not complete.",
       },
     );
   }
@@ -315,6 +419,7 @@ export async function verifyWithSigstore(
 
     markCryptographicFailure(
       report,
+      error,
       message,
     );
 

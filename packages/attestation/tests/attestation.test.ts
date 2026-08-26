@@ -701,6 +701,67 @@ describe(
 );
 
 
+
+describe(
+  "invalid signer threshold handling",
+  () => {
+    it.each([
+      0,
+      -1,
+      1.5,
+    ])(
+      "fails closed for minimum_signers %s",
+      (minimumSigners) => {
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+
+              subject: {
+                kind:
+                  "tracepack-pack",
+
+                digest: {
+                  algorithm:
+                    "sha256",
+
+                  value:
+                    PACK_DIGEST,
+                },
+
+                pack_version: 4,
+              },
+
+              requirements: [
+                {
+                  id:
+                    "invalid-threshold",
+
+                  statement_type:
+                    "review.approval",
+
+                  minimum_signers:
+                    minimumSigners,
+                },
+              ],
+            },
+            [],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.satisfied,
+        ).toBe(false);
+      },
+    );
+  },
+);
+
 describe(
   "multi-party signer identity uniqueness",
   () => {
