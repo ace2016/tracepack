@@ -308,12 +308,6 @@ export async function verifyWithSigstore(
     signer = await verify(
       parsedBundle,
       Buffer.from(payload),
-      {
-        certificateIssuer:
-          policy.certificateIssuer,
-        certificateIdentityURI:
-          policy.certificateIdentityURI,
-      },
     );
   } catch (error) {
     const message =
@@ -373,9 +367,70 @@ export async function verifyWithSigstore(
     "passed",
     {
       message:
-        "Signer identity verified.",
+        "Signer identity extracted from verified certificate.",
     },
   );
+
+  const issuerMatches =
+    policy.certificateIssuer === undefined ||
+    policy.certificateIssuer ===
+      identity.issuer;
+
+  const subjectMatches =
+    policy.certificateIdentityURI ===
+      undefined ||
+    policy.certificateIdentityURI ===
+      identity.subject;
+
+  if (
+    !issuerMatches ||
+    !subjectMatches
+  ) {
+    const mismatches: string[] = [];
+
+    if (!issuerMatches) {
+      mismatches.push(
+        "certificate issuer does not match configured policy",
+      );
+    }
+
+    if (!subjectMatches) {
+      mismatches.push(
+        "certificate identity URI does not match configured policy",
+      );
+    }
+
+    const message =
+      `Sigstore identity policy rejected signer: ${mismatches.join(
+        "; ",
+      )}.`;
+
+    setVerificationStage(
+      report,
+      "policy",
+      "failed",
+      {
+        code:
+          "SIGSTORE_IDENTITY_POLICY_MISMATCH",
+        message,
+      },
+    );
+
+    report.evidence = {
+      ...report.evidence,
+      certificate_issuer:
+        identity.issuer,
+      certificate_subject:
+        identity.subject,
+      transparency_log_verified:
+        true,
+    };
+
+    throw new SigstoreVerificationError(
+      message,
+      report,
+    );
+  }
 
   setVerificationStage(
     report,
