@@ -1,0 +1,28 @@
+{
+  "name": "@tracepack/attestation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Portable TracePack attestation contract for binding independently verifiable statements and signatures to immutable pack digests.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema/tracepack-attestation.v1.json": "./schema/tracepack-attestation.v1.json"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "canonicalize": "^3.0.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

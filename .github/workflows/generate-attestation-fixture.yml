@@ -1,0 +1,73 @@
+name: Generate attestation fixture
+
+on:
+  pull_request:
+    paths:
+      - "packages/attestation/**"
+      - "packages/attestation-sigstore/**"
+      - ".github/workflows/generate-attestation-fixture.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck attestation Sigstore package
+        run: pnpm --filter @tracepack/attestation-sigstore typecheck
+
+      - name: Generate real TracePack attestation fixture
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          (
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'
+          )
+        working-directory: packages/attestation-sigstore
+        run: pnpm exec tsx scripts/generate-attestation-fixture.ts
+
+      - name: Verify TracePack attestation fixture
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          (
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'
+          )
+        working-directory: packages/attestation-sigstore
+        run: pnpm exec tsx scripts/verify-attestation-fixture.ts
+
+      - name: Upload fixture
+        if: >
+          github.event_name == 'workflow_dispatch' ||
+          (
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'
+          )
+        uses: actions/upload-artifact@v4
+        with:
+          name: tracepack-attestation-sigstore-fixture
+          path: |
+            packages/attestation-sigstore/fixture-output/attestation-statement.json
+            packages/attestation-sigstore/fixture-output/attestation-payload.bin
+            packages/attestation-sigstore/fixture-output/attestation.sigstore.json
+          if-no-files-found: error
+          retention-days: 7

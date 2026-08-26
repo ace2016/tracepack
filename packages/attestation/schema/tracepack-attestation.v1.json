@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tracepack.org/schema/tracepack-attestation.v1.json",
+  "title": "TracePack Signed Attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "statement",
+    "signature"
+  ],
+  "properties": {
+    "statement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "attestation_id",
+        "subject",
+        "statement",
+        "signer",
+        "issued_at"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "tracepack-attestation/v1"
+        },
+        "attestation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "subject": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "digest"
+          ],
+          "properties": {
+            "kind": {
+              "const": "tracepack-pack"
+            },
+            "digest": {
+              "$ref": "#/$defs/sha256"
+            },
+            "pack_version": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              ]
+            }
+          }
+        },
+        "statement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "text"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192
+            }
+          }
+        },
+        "signer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "party_id"
+          ],
+          "properties": {
+            "party_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "organisation": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              }
+            },
+            "expected_identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "issuer",
+                "subject"
+              ],
+              "properties": {
+                "issuer": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048
+                },
+                "subject": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              }
+            }
+          }
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "metadata": {
+          "type": "object"
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "content_digest",
+        "bundle_media_type",
+        "bundle"
+      ],
+      "properties": {
+        "method": {
+          "const": "sigstore"
+        },
+        "content_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bundle_media_type": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "bundle": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
