@@ -10,6 +10,7 @@ import type {
 
 import {
   computePackSnapshotDigest,
+  createPackAttestationStatement,
   createPackSnapshot,
   packSnapshotToAttestationSubject,
 } from "../src/index.js";
@@ -402,6 +403,208 @@ describe(
         ).toThrow(
           "Duplicate evidence id:",
         );
+      },
+    );
+
+    it(
+      "creates an attestation statement bound to the exact pack subject",
+      async () => {
+        const snapshot =
+          createPackSnapshot(
+            project(),
+            7,
+          );
+
+        const expectedSubject =
+          await packSnapshotToAttestationSubject(
+            snapshot,
+          );
+
+        const statement =
+          await createPackAttestationStatement(
+            snapshot,
+            {
+              attestationId:
+                "attestation-1",
+              statementType:
+                "approval",
+              statementText:
+                "I approve this pack.",
+              issuedAt:
+                "2026-08-26T14:30:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+                display_name:
+                  "Reviewer One",
+                role:
+                  "reviewer",
+              },
+            },
+          );
+
+        expect(
+          statement.schema_version,
+        ).toBe(
+          "tracepack-attestation/v1",
+        );
+
+        expect(
+          statement.subject,
+        ).toEqual(
+          expectedSubject,
+        );
+
+        expect(
+          statement.subject.pack_version,
+        ).toBe(7);
+
+        expect(
+          statement.statement.type,
+        ).toBe("approval");
+
+        expect(
+          statement.signer.party_id,
+        ).toBe(
+          "reviewer-1",
+        );
+      },
+    );
+
+    it(
+      "changes the attestation subject when the finalized pack changes",
+      async () => {
+        const before =
+          project();
+
+        const after =
+          project();
+
+        after.evidence[0]!
+          .contentHash =
+          "f".repeat(64);
+
+        const beforeStatement =
+          await createPackAttestationStatement(
+            createPackSnapshot(
+              before,
+              1,
+            ),
+            {
+              attestationId:
+                "attestation-before",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T14:30:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        const afterStatement =
+          await createPackAttestationStatement(
+            createPackSnapshot(
+              after,
+              1,
+            ),
+            {
+              attestationId:
+                "attestation-after",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T14:30:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        expect(
+          beforeStatement
+            .subject.digest.value,
+        ).not.toBe(
+          afterStatement
+            .subject.digest.value,
+        );
+      },
+    );
+
+    it(
+      "changes the attestation subject between pack versions",
+      async () => {
+        const source =
+          project();
+
+        const versionOne =
+          await createPackAttestationStatement(
+            createPackSnapshot(
+              source,
+              1,
+            ),
+            {
+              attestationId:
+                "attestation-v1",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T14:30:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        const versionTwo =
+          await createPackAttestationStatement(
+            createPackSnapshot(
+              source,
+              2,
+            ),
+            {
+              attestationId:
+                "attestation-v2",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T14:30:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        expect(
+          versionOne
+            .subject.digest.value,
+        ).not.toBe(
+          versionTwo
+            .subject.digest.value,
+        );
+
+        expect(
+          versionOne
+            .subject.pack_version,
+        ).toBe(1);
+
+        expect(
+          versionTwo
+            .subject.pack_version,
+        ).toBe(2);
       },
     );
 
