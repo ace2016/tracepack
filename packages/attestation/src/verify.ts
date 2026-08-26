@@ -358,6 +358,23 @@ export async function verifySignedAttestation(
             "Verified signer identity does not match the identity declared by the attestation.",
         },
       );
+
+      if (
+        report.stages.some(
+          (stage) =>
+            stage.id === "policy",
+        )
+      ) {
+        setVerificationStage(
+          report,
+          "policy",
+          "skipped",
+          {
+            message:
+              "Skipped because attestation identity binding failed.",
+          },
+        );
+      }
     }
 
     return {

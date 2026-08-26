@@ -359,6 +359,58 @@ describe(
         ).toThrow(
           "Value cannot be represented as canonical JSON.",
         );
+
+        expect(
+          () =>
+            canonicalizeJson({
+              nested: undefined,
+            }),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          () =>
+            canonicalizeJson([
+              "valid",
+              undefined,
+            ]),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          () =>
+            canonicalizeJson({
+              value: Number.NaN,
+            }),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          () =>
+            canonicalizeJson({
+              value:
+                Number.POSITIVE_INFINITY,
+            }),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        const circular:
+          Record<string, unknown> = {};
+
+        circular.self = circular;
+
+        expect(
+          () =>
+            canonicalizeJson(
+              circular,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
       },
     );
   },
@@ -551,6 +603,48 @@ describe(
               stage.status === "pending",
           ),
         ).toBe(true);
+      },
+    );
+
+    it(
+      "clears stale stage metadata when a stage changes",
+      async () => {
+        const {
+          createVerificationReport,
+          setVerificationStage,
+          verificationStage,
+        } = await import("../src");
+
+        const report =
+          createVerificationReport();
+
+        setVerificationStage(
+          report,
+          "trusted_root",
+          "pending",
+          {
+            code:
+              "TRUST_RUNNING",
+            message:
+              "Verification is running.",
+          },
+        );
+
+        setVerificationStage(
+          report,
+          "trusted_root",
+          "passed",
+        );
+
+        expect(
+          verificationStage(
+            report,
+            "trusted_root",
+          ),
+        ).toEqual({
+          id: "trusted_root",
+          status: "passed",
+        });
       },
     );
 
@@ -795,6 +889,17 @@ describe(
           ).toBe(
             "ATTESTATION_IDENTITY_MISMATCH",
           );
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "policy",
+              )
+              ?.status,
+          ).toBe("skipped");
         }
       },
     );

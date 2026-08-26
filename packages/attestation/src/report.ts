@@ -53,6 +53,9 @@ export function setVerificationStage(
 
   stage.status = status;
 
+  delete stage.code;
+  delete stage.message;
+
   if (options.code !== undefined) {
     stage.code = options.code;
   }

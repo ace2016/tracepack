@@ -3,9 +3,119 @@ import type {
   AttestationStatementV1,
 } from "./types";
 
+function assertCanonicalJsonValue(
+  value: unknown,
+  seen: Set<object> = new Set(),
+): void {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
+    return;
+  }
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new TypeError(
+        "Value cannot be represented as canonical JSON.",
+      );
+    }
+
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    if (seen.has(value)) {
+      throw new TypeError(
+        "Value cannot be represented as canonical JSON.",
+      );
+    }
+
+    seen.add(value);
+
+    for (
+      let index = 0;
+      index < value.length;
+      index += 1
+    ) {
+      if (!(index in value)) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
+      assertCanonicalJsonValue(
+        value[index],
+        seen,
+      );
+    }
+
+    seen.delete(value);
+    return;
+  }
+
+  if (
+    typeof value === "object" &&
+    value !== null
+  ) {
+    const prototype =
+      Object.getPrototypeOf(value);
+
+    if (
+      prototype !== Object.prototype &&
+      prototype !== null
+    ) {
+      throw new TypeError(
+        "Value cannot be represented as canonical JSON.",
+      );
+    }
+
+    if (seen.has(value)) {
+      throw new TypeError(
+        "Value cannot be represented as canonical JSON.",
+      );
+    }
+
+    if (
+      Object.getOwnPropertySymbols(value)
+        .length > 0
+    ) {
+      throw new TypeError(
+        "Value cannot be represented as canonical JSON.",
+      );
+    }
+
+    seen.add(value);
+
+    for (
+      const key of Object.keys(value)
+    ) {
+      assertCanonicalJsonValue(
+        (
+          value as Record<
+            string,
+            unknown
+          >
+        )[key],
+        seen,
+      );
+    }
+
+    seen.delete(value);
+    return;
+  }
+
+  throw new TypeError(
+    "Value cannot be represented as canonical JSON.",
+  );
+}
+
 export function canonicalizeJson(
   value: unknown,
 ): string {
+  assertCanonicalJsonValue(value);
+
   const result =
     canonicalize(value);
 
