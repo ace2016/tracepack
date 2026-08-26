@@ -502,6 +502,63 @@ describe(
           "Value cannot be represented as canonical JSON.",
         );
 
+        let getterReads = 0;
+
+        const accessorObject:
+          Record<string, unknown> = {};
+
+        Object.defineProperty(
+          accessorObject,
+          "value",
+          {
+            enumerable: true,
+            get() {
+              getterReads += 1;
+
+              return getterReads === 1
+                ? "ok"
+                : undefined;
+            },
+          },
+        );
+
+        expect(
+          () =>
+            canonicalizeJson(
+              accessorObject,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          getterReads,
+        ).toBe(0);
+
+        const accessorArray:
+          unknown[] = ["initial"];
+
+        Object.defineProperty(
+          accessorArray,
+          "0",
+          {
+            enumerable: true,
+            configurable: true,
+            get() {
+              return "dynamic";
+            },
+          },
+        );
+
+        expect(
+          () =>
+            canonicalizeJson(
+              accessorArray,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
         const circular:
           Record<string, unknown> = {};
 

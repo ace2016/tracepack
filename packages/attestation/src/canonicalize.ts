@@ -129,8 +129,24 @@ function assertCanonicalJsonValue(
         );
       }
 
+      const descriptor =
+        Object.getOwnPropertyDescriptor(
+          value,
+          String(index),
+        );
+
+      if (
+        descriptor === undefined ||
+        "get" in descriptor ||
+        "set" in descriptor
+      ) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
       assertCanonicalJsonValue(
-        value[index],
+        descriptor.value,
         seen,
       );
     }
@@ -177,13 +193,24 @@ function assertCanonicalJsonValue(
     ) {
       assertValidUnicodeString(key);
 
+      const descriptor =
+        Object.getOwnPropertyDescriptor(
+          value,
+          key,
+        );
+
+      if (
+        descriptor === undefined ||
+        "get" in descriptor ||
+        "set" in descriptor
+      ) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
       assertCanonicalJsonValue(
-        (
-          value as Record<
-            string,
-            unknown
-          >
-        )[key],
+        descriptor.value,
         seen,
       );
     }
