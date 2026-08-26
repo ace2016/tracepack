@@ -1,0 +1,27 @@
+{
+  "name": "@tracepack/pack-attestation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Integration layer binding immutable TracePack pack snapshots to portable attestation subjects.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tracepack/attestation": "workspace:*",
+    "@tracepack/evidence-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
