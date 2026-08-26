@@ -74,7 +74,7 @@ jobs:
             ../release-packages/tracepack-evidence-sdk-*.tgz \
             ../release-packages/tracepack-integration-*.tgz \
             ../release-packages/tracepack-cli-*.tgz \
-            ../release-packages/tracepack-attestation-*.tgz \
+            ../release-packages/tracepack-attestation-[0-9]*.tgz \
             ../release-packages/tracepack-attestation-sigstore-*.tgz \
             ../release-packages/tracepack-pack-attestation-*.tgz
           node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk'), import('@tracepack/integration'), import('@tracepack/attestation'), import('@tracepack/attestation-sigstore'), import('@tracepack/pack-attestation')]).then(() => console.log('Developer package imports passed'))"
@@ -118,7 +118,7 @@ jobs:
             release-packages/tracepack-evidence-sdk-*.tgz \
             release-packages/tracepack-integration-*.tgz \
             release-packages/tracepack-cli-*.tgz \
-            release-packages/tracepack-attestation-*.tgz \
+            release-packages/tracepack-attestation-[0-9]*.tgz \
             release-packages/tracepack-attestation-sigstore-*.tgz \
             release-packages/tracepack-pack-attestation-*.tgz
           do
