@@ -4,12 +4,24 @@ import {
   it,
 } from "vitest";
 
+import {
+  computeAttestationStatementHash,
+  evaluateAttestationPolicy,
+  verifySignedAttestation,
+} from "@tracepack/attestation";
+
+import type {
+  AttestationStatementV1,
+  SignedAttestationV1,
+} from "@tracepack/attestation";
+
 import type {
   TracepackProject,
 } from "@tracepack/evidence-core";
 
 import {
   computePackSnapshotDigest,
+  createPackAttestationPolicy,
   createPackAttestationStatement,
   createPackSnapshot,
   packSnapshotToAttestationSubject,
@@ -82,6 +94,27 @@ function project(): TracepackProject {
         mimeType: "application/pdf",
       },
     ],
+  };
+}
+
+async function signedEnvelope(
+  statement: AttestationStatementV1,
+): Promise<SignedAttestationV1> {
+  return {
+    statement,
+    signature: {
+      method: "sigstore",
+      content_digest: {
+        algorithm: "sha256",
+        value:
+          await computeAttestationStatementHash(
+            statement,
+          ),
+      },
+      bundle_media_type:
+        "application/vnd.dev.sigstore.bundle+json;version=0.3",
+      bundle: {},
+    },
   };
 }
 
@@ -605,6 +638,249 @@ describe(
           versionTwo
             .subject.pack_version,
         ).toBe(2);
+      },
+    );
+
+    it(
+      "accepts a verified attestation for the exact finalized pack",
+      async () => {
+        const snapshot =
+          createPackSnapshot(
+            project(),
+            1,
+          );
+
+        const statement =
+          await createPackAttestationStatement(
+            snapshot,
+            {
+              attestationId:
+                "approval-pack-v1",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T15:00:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        const verified =
+          await verifySignedAttestation(
+            await signedEnvelope(
+              statement,
+            ),
+            async () => ({
+              issuer:
+                "https://token.actions.githubusercontent.com",
+              subject:
+                "reviewer@example.test",
+            }),
+          );
+
+        expect(
+          verified.valid,
+        ).toBe(true);
+
+        const policy =
+          await createPackAttestationPolicy(
+            snapshot,
+            [
+              {
+                id:
+                  "approval",
+                statement_type:
+                  "approval",
+                minimum_signers:
+                  1,
+              },
+            ],
+          );
+
+        const result =
+          evaluateAttestationPolicy(
+            policy,
+            [verified],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "does not accept a pack v1 attestation for pack v2",
+      async () => {
+        const source =
+          project();
+
+        const versionOne =
+          createPackSnapshot(
+            source,
+            1,
+          );
+
+        const versionTwo =
+          createPackSnapshot(
+            source,
+            2,
+          );
+
+        const statement =
+          await createPackAttestationStatement(
+            versionOne,
+            {
+              attestationId:
+                "approval-pack-v1",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T15:00:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        const verified =
+          await verifySignedAttestation(
+            await signedEnvelope(
+              statement,
+            ),
+            async () => ({
+              issuer:
+                "https://token.actions.githubusercontent.com",
+              subject:
+                "reviewer@example.test",
+            }),
+          );
+
+        expect(
+          verified.valid,
+        ).toBe(true);
+
+        const versionTwoPolicy =
+          await createPackAttestationPolicy(
+            versionTwo,
+            [
+              {
+                id:
+                  "approval",
+                statement_type:
+                  "approval",
+                minimum_signers:
+                  1,
+              },
+            ],
+          );
+
+        const result =
+          evaluateAttestationPolicy(
+            versionTwoPolicy,
+            [verified],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.matched_parties,
+        ).toEqual([]);
+      },
+    );
+
+    it(
+      "does not accept an attestation after finalized evidence changes",
+      async () => {
+        const before =
+          project();
+
+        const after =
+          project();
+
+        after.evidence[0]!
+          .contentHash =
+          "f".repeat(64);
+
+        const beforeSnapshot =
+          createPackSnapshot(
+            before,
+            1,
+          );
+
+        const afterSnapshot =
+          createPackSnapshot(
+            after,
+            1,
+          );
+
+        const statement =
+          await createPackAttestationStatement(
+            beforeSnapshot,
+            {
+              attestationId:
+                "approval-before-change",
+              statementType:
+                "approval",
+              statementText:
+                "Approved.",
+              issuedAt:
+                "2026-08-26T15:00:00Z",
+              signer: {
+                party_id:
+                  "reviewer-1",
+              },
+            },
+          );
+
+        const verified =
+          await verifySignedAttestation(
+            await signedEnvelope(
+              statement,
+            ),
+            async () => ({
+              issuer:
+                "https://token.actions.githubusercontent.com",
+              subject:
+                "reviewer@example.test",
+            }),
+          );
+
+        expect(
+          verified.valid,
+        ).toBe(true);
+
+        const changedPackPolicy =
+          await createPackAttestationPolicy(
+            afterSnapshot,
+            [
+              {
+                id:
+                  "approval",
+                statement_type:
+                  "approval",
+                minimum_signers:
+                  1,
+              },
+            ],
+          );
+
+        expect(
+          evaluateAttestationPolicy(
+            changedPackPolicy,
+            [verified],
+          ).satisfied,
+        ).toBe(false);
       },
     );
 

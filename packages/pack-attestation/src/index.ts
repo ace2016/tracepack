@@ -12,3 +12,4 @@ export {
   packSnapshotToAttestationSubject,
 } from "./subject.js";
 export * from "./statement.js";
+export * from "./policy.js";
