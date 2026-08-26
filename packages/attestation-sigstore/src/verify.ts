@@ -1,5 +1,6 @@
 import {
   TUFError,
+  ValidationError,
   VerificationError,
   verify,
 } from "sigstore";
@@ -85,6 +86,7 @@ function markCryptographicSuccess(
 }
 
 type SigstoreFailureStage =
+  | "bundle"
   | "trusted_root"
   | "certificate"
   | "transparency_log"
@@ -96,9 +98,45 @@ type ClassifiedSigstoreFailure = {
   code: string;
 };
 
+function hasRfc3161Timestamps(
+  bundle?: SerializedBundle,
+): boolean {
+  if (!bundle) {
+    return false;
+  }
+
+  const value =
+    bundle as unknown as {
+      verificationMaterial?: {
+        timestampVerificationData?: {
+          rfc3161Timestamps?: unknown[];
+        };
+      };
+    };
+
+  const timestamps =
+    value.verificationMaterial
+      ?.timestampVerificationData
+      ?.rfc3161Timestamps;
+
+  return (
+    Array.isArray(timestamps) &&
+    timestamps.length > 0
+  );
+}
+
 export function classifySigstoreFailure(
   error: unknown,
+  bundle?: SerializedBundle,
 ): ClassifiedSigstoreFailure {
+  if (error instanceof ValidationError) {
+    return {
+      stage: "bundle",
+      code:
+        "SIGSTORE_BUNDLE_INVALID",
+    };
+  }
+
   if (error instanceof TUFError) {
     return {
       stage: "trusted_root",
@@ -131,10 +169,23 @@ export function classifySigstoreFailure(
         };
 
       case "TIMESTAMP_ERROR":
+        if (
+          hasRfc3161Timestamps(
+            bundle,
+          )
+        ) {
+          return {
+            stage: "timestamp",
+            code:
+              "SIGSTORE_TIMESTAMP_FAILED",
+          };
+        }
+
         return {
-          stage: "timestamp",
+          stage:
+            "transparency_log",
           code:
-            "SIGSTORE_TIMESTAMP_FAILED",
+            "SIGSTORE_TRANSPARENCY_LOG_FAILED",
         };
 
       case "SIGNATURE_ERROR":
@@ -164,11 +215,32 @@ function markCryptographicFailure(
   report: AttestationVerificationReportV1,
   error: unknown,
   message: string,
+  bundle?: SerializedBundle,
 ): void {
   const failure =
     classifySigstoreFailure(
       error,
+      bundle,
     );
+
+  if (failure.stage === "bundle") {
+    setVerificationStage(
+      report,
+      "bundle",
+      "failed",
+      {
+        code:
+          failure.code,
+        message,
+      },
+    );
+
+    markSkippedAfterBundleFailure(
+      report,
+    );
+
+    return;
+  }
 
   for (const stage of [
     "trusted_root",
@@ -421,6 +493,7 @@ export async function verifyWithSigstore(
       report,
       error,
       message,
+      parsedBundle,
     );
 
     throw new SigstoreVerificationError(

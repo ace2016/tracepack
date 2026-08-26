@@ -1,5 +1,6 @@
 import {
   TUFError,
+  ValidationError,
   VerificationError,
 } from "sigstore";
 
@@ -24,6 +25,133 @@ import {
   verifyWithSigstore,
 } from "../src";
 
+
+describe(
+  "Sigstore bundle failure classification",
+  () => {
+    it(
+      "classifies Sigstore validation errors as bundle failures",
+      () => {
+        const error =
+          Object.create(
+            ValidationError.prototype,
+          ) as ValidationError;
+
+        expect(
+          classifySigstoreFailure(
+            error,
+          ),
+        ).toEqual({
+          stage: "bundle",
+          code:
+            "SIGSTORE_BUNDLE_INVALID",
+        });
+      },
+    );
+  },
+);
+
+describe(
+  "Sigstore timestamp source classification",
+  () => {
+    it(
+      "attributes timestamp errors without RFC3161 material to the transparency log",
+      () => {
+        const error =
+          new VerificationError({
+            code:
+              "TIMESTAMP_ERROR",
+            message:
+              "timestamp threshold not satisfied",
+          });
+
+        const bundle = {
+          mediaType:
+            "application/vnd.dev.sigstore.bundle+json;version=0.2",
+
+          verificationMaterial: {
+            tlogEntries: [],
+          },
+
+          messageSignature: {
+            messageDigest: {
+              algorithm:
+                "SHA2_256",
+              digest: "",
+            },
+            signature: "",
+          },
+        } as unknown as import(
+          "@sigstore/bundle"
+        ).SerializedBundle;
+
+        expect(
+          classifySigstoreFailure(
+            error,
+            bundle,
+          ),
+        ).toEqual({
+          stage:
+            "transparency_log",
+          code:
+            "SIGSTORE_TRANSPARENCY_LOG_FAILED",
+        });
+      },
+    );
+
+    it(
+      "attributes timestamp errors with RFC3161 material to the timestamp stage",
+      () => {
+        const error =
+          new VerificationError({
+            code:
+              "TIMESTAMP_ERROR",
+            message:
+              "timestamp could not be verified",
+          });
+
+        const bundle = {
+          mediaType:
+            "application/vnd.dev.sigstore.bundle.v0.3+json",
+
+          verificationMaterial: {
+            timestampVerificationData: {
+              rfc3161Timestamps: [
+                {
+                  signedTimestamp:
+                    "placeholder",
+                },
+              ],
+            },
+          },
+
+          messageSignature: {
+            messageDigest: {
+              algorithm:
+                "SHA2_256",
+              digest: "",
+            },
+            signature: "",
+          },
+        } as unknown as import(
+          "@sigstore/bundle"
+        ).SerializedBundle;
+
+        expect(
+          classifySigstoreFailure(
+            error,
+            bundle,
+          ),
+        ).toEqual({
+          stage:
+            "timestamp",
+          code:
+            "SIGSTORE_TIMESTAMP_FAILED",
+        });
+      },
+    );
+  },
+);
 
 describe(
   "Sigstore verification failure classification",
@@ -101,7 +229,7 @@ describe(
     );
 
     it(
-      "classifies timestamp failures",
+      "classifies timestamp errors without RFC3161 material as transparency log failures",
       () => {
         const error =
           new VerificationError({
@@ -117,9 +245,9 @@ describe(
           ),
         ).toEqual({
           stage:
-            "timestamp",
+            "transparency_log",
           code:
-            "SIGSTORE_TIMESTAMP_FAILED",
+            "SIGSTORE_TRANSPARENCY_LOG_FAILED",
         });
       },
     );
