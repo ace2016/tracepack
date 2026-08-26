@@ -885,6 +885,267 @@ describe(
     );
 
     it(
+      "changes the digest when evidence MIME type changes",
+      async () => {
+        const before =
+          project();
+
+        const after =
+          project();
+
+        after.evidence[0]!.mimeType =
+          "image/webp";
+
+        expect(
+          await computePackSnapshotDigest(
+            createPackSnapshot(
+              before,
+              1,
+            ),
+          ),
+        ).not.toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(
+              after,
+              1,
+            ),
+          ),
+        );
+      },
+    );
+
+    it(
+      "binds export-relevant privacy redaction and observation inputs",
+      async () => {
+        const before =
+          project();
+
+        before.evidence[0]!
+          .privacyFindings = [
+            {
+              id: "privacy-1",
+              kind: "email",
+              label: "Email address",
+              value: "a@example.test",
+              excerpt:
+                "Contact a@example.test",
+              decision: "remove",
+              field: "title",
+            },
+          ];
+
+        before.evidence[0]!
+          .manualRedactions = [
+            {
+              id: "region-1",
+              kind: "image-region",
+              x: 0.1,
+              y: 0.2,
+              width: 0.3,
+              height: 0.1,
+              decision: "remove",
+              createdAt:
+                "2026-08-26T15:00:00Z",
+            },
+          ];
+
+        before.evidence[0]!
+          .provenance = {
+            producerId:
+              "producer-1",
+            producerName:
+              "Example Producer",
+            producerVersion:
+              "1.0.0",
+            schemaVersion: 1,
+            capturedAt:
+              "2026-08-26T14:00:00Z",
+          };
+
+        before.evidence[0]!
+          .observations = [
+            {
+              id: "observation-1",
+              kind: "claim",
+              label: "Reported issue",
+              detail:
+                "Deposit not returned.",
+              confidence: 0.9,
+              data: {
+                source: "producer",
+              },
+            },
+          ];
+
+        const after =
+          structuredClone(before);
+
+        after.evidence[0]!
+          .manualRedactions![0]!
+          .decision = "keep";
+
+        after.evidence[0]!
+          .observations![0]!
+          .detail =
+          "Deposit partially returned.";
+
+        expect(
+          await computePackSnapshotDigest(
+            createPackSnapshot(
+              before,
+              1,
+            ),
+          ),
+        ).not.toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(
+              after,
+              1,
+            ),
+          ),
+        );
+      },
+    );
+
+    it(
+      "detaches nested export inputs from the mutable project",
+      async () => {
+        const source =
+          project();
+
+        source.evidence[0]!
+          .privacyFindings = [
+            {
+              id: "privacy-1",
+              kind: "email",
+              label: "Email address",
+              value: "a@example.test",
+              excerpt:
+                "Contact a@example.test",
+              decision: "remove",
+              field: "title",
+            },
+          ];
+
+        source.evidence[0]!
+          .manualRedactions = [
+            {
+              id: "region-1",
+              kind: "image-region",
+              x: 0.1,
+              y: 0.2,
+              width: 0.3,
+              height: 0.1,
+              decision: "remove",
+              createdAt:
+                "2026-08-26T15:00:00Z",
+            },
+          ];
+
+        source.evidence[0]!
+          .provenance = {
+            producerId:
+              "producer-1",
+            producerName:
+              "Example Producer",
+            schemaVersion: 1,
+            capturedAt:
+              "2026-08-26T14:00:00Z",
+          };
+
+        source.evidence[0]!
+          .observations = [
+            {
+              id: "observation-1",
+              kind: "claim",
+              label: "Reported issue",
+              detail:
+                "Deposit not returned.",
+              data: {
+                nested: {
+                  value: "original",
+                },
+              },
+            },
+          ];
+
+        const snapshot =
+          createPackSnapshot(
+            source,
+            1,
+          );
+
+        const digestBefore =
+          await computePackSnapshotDigest(
+            snapshot,
+          );
+
+        source.evidence[0]!
+          .privacyFindings![0]!
+          .decision = "keep";
+
+        source.evidence[0]!
+          .manualRedactions![0]!
+          .x = 0.9;
+
+        source.evidence[0]!
+          .provenance!
+          .producerName =
+          "Changed Producer";
+
+        const nested =
+          source.evidence[0]!
+            .observations![0]!
+            .data!.nested as {
+              value: string;
+            };
+
+        nested.value = "changed";
+
+        const digestAfter =
+          await computePackSnapshotDigest(
+            snapshot,
+          );
+
+        expect(
+          digestAfter,
+        ).toBe(
+          digestBefore,
+        );
+
+        expect(
+          snapshot.evidence[0]!
+            .privacy_findings[0]!
+            .decision,
+        ).toBe("remove");
+
+        expect(
+          snapshot.evidence[0]!
+            .manual_redactions[0]!
+            .x,
+        ).toBe(0.1);
+
+        expect(
+          snapshot.evidence[0]!
+            .provenance!
+            .producer_name,
+        ).toBe(
+          "Example Producer",
+        );
+
+        expect(
+          snapshot.evidence[0]!
+            .observations[0]!
+            .data,
+        ).toEqual({
+          nested: {
+            value: "original",
+          },
+        });
+      },
+    );
+
+    it(
       "rejects invalid pack versions",
       () => {
         for (
