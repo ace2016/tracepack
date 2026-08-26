@@ -47,6 +47,20 @@ export function evaluateAttestationPolicy(
           };
         }
 
+        if (
+          requirement.role !== undefined &&
+          requirement.role.length === 0
+        ) {
+          return {
+            requirement_id:
+              requirement.id,
+            satisfied: false,
+            required:
+              requirement.minimum_signers,
+            matched_parties: [],
+          };
+        }
+
         const parties = new Map<
           string,
           string
@@ -77,7 +91,7 @@ export function evaluateAttestationPolicy(
           }
 
           if (
-            requirement.role &&
+            requirement.role !== undefined &&
             statement.signer.role !==
               requirement.role
           ) {

@@ -72,6 +72,12 @@ export function markCryptographicSuccess(
       report,
       stage,
       "passed",
+      stage === "trusted_root"
+        ? {
+            message:
+              "Sigstore trusted root verification passed.",
+          }
+        : {},
     );
   }
 

@@ -155,6 +155,73 @@ describe(
 );
 
 describe(
+  "Sigstore successful trust reporting",
+  () => {
+    it(
+      "replaces the running trusted-root message after success",
+      async () => {
+        const {
+          createVerificationReport,
+          setVerificationStage,
+        } = await import(
+          "@tracepack/attestation"
+        );
+
+        const report =
+          createVerificationReport();
+
+        setVerificationStage(
+          report,
+          "trusted_root",
+          "pending",
+          {
+            message:
+              "Sigstore trust verification is running.",
+          },
+        );
+
+        const bundle = {
+          mediaType:
+            "application/vnd.dev.sigstore.bundle+json;version=0.2",
+
+          verificationMaterial: {
+            tlogEntries: [],
+          },
+
+          messageSignature: {
+            messageDigest: {
+              algorithm:
+                "SHA2_256",
+              digest: "",
+            },
+            signature: "",
+          },
+        } as unknown as import(
+          "@sigstore/bundle"
+        ).SerializedBundle;
+
+        markCryptographicSuccess(
+          report,
+          bundle,
+        );
+
+        expect(
+          report.stages.find(
+            (stage) =>
+              stage.id ===
+              "trusted_root",
+          ),
+        ).toMatchObject({
+          status: "passed",
+          message:
+            "Sigstore trusted root verification passed.",
+        });
+      },
+    );
+  },
+);
+
+describe(
   "Sigstore successful timestamp reporting",
   () => {
     it(

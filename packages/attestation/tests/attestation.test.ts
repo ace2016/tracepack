@@ -849,6 +849,81 @@ describe(
 
 
 describe(
+  "invalid role constraint handling",
+  () => {
+    it(
+      "fails closed for an explicitly empty role",
+      async () => {
+        const value =
+          statement(
+            "party-a",
+            "organisation-signatory",
+            "organisation.signoff",
+          );
+
+        const envelope =
+          await signed(value);
+
+        const verified:
+          AttestationVerificationResultV1[] =
+          [
+            {
+              valid: true,
+              attestation:
+                envelope,
+              verified_identity: {
+                issuer:
+                  "issuer",
+                subject:
+                  "party-a",
+              },
+              identity_binding:
+                "matched",
+            },
+          ];
+
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+
+              subject:
+                value.subject,
+
+              requirements: [
+                {
+                  id:
+                    "empty-role",
+                  statement_type:
+                    "organisation.signoff",
+                  role: "",
+                  minimum_signers: 1,
+                },
+              ],
+            },
+            verified,
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.matched_parties,
+        ).toEqual([]);
+      },
+    );
+  },
+);
+
+describe(
   "invalid signer threshold handling",
   () => {
     it.each([
