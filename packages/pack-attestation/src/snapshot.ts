@@ -138,8 +138,7 @@ export function createPackSnapshot(
             item.provenance ?? null,
           observations:
             item.observations ?? [],
-        }))
-        .sort(compareEvidence),
+        })),
 
     pack_version: packVersion,
   };

@@ -88,7 +88,7 @@ describe(
   "TracePack pack attestation integration",
   () => {
     it(
-      "creates the same digest regardless of evidence input order",
+      "changes the digest when finalized evidence order changes",
       async () => {
         const first = project();
         const second = project();
@@ -99,7 +99,7 @@ describe(
           await computePackSnapshotDigest(
             createPackSnapshot(first, 1),
           ),
-        ).toBe(
+        ).not.toBe(
           await computePackSnapshotDigest(
             createPackSnapshot(second, 1),
           ),

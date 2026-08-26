@@ -11,3 +11,4 @@ export {
   computePackSnapshotDigest,
   packSnapshotToAttestationSubject,
 } from "./subject.js";
+export * from "./statement.js";
