@@ -122,17 +122,12 @@ try {
   };
 
   for (const [folder, requiredEntries] of Object.entries(requiredArchiveEntries)) {
-    const expectedArchivePrefix =
-      folder === "attestation"
-        ? "tracepack-attestation-0."
-        : `tracepack-${folder}-`;
+    const expectedArchiveName =
+      `tracepack-${folder}-${expectedVersion}.tgz`;
 
     const archiveName = archives.find(
       (name) =>
-        name.startsWith(
-          expectedArchivePrefix,
-        ) &&
-        name.endsWith(".tgz"),
+        name === expectedArchiveName,
     );
 
     if (!archiveName) {
