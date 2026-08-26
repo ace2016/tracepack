@@ -21,10 +21,10 @@ import type {
 
 import {
   computePackSnapshotDigest,
-  createPackAttestationPolicy,
-  createPackAttestationStatement,
+  createPackAttestationPolicy as createPackAttestationPolicyWithFiles,
+  createPackAttestationStatement as createPackAttestationStatementWithFiles,
   createPackSnapshot,
-  packSnapshotToAttestationSubject,
+  packSnapshotToAttestationSubject as packSnapshotToAttestationSubjectWithFiles,
 } from "../src/index.js";
 
 function project(): TracepackProject {
@@ -72,7 +72,7 @@ function project(): TracepackProject {
         importedAt:
           "2026-08-26T10:30:00Z",
         contentHash:
-          "b".repeat(64),
+          "2c8648d103e3dd7ad87660da0f126a1443b6d21ac1bd3ec000c5e24e2373a90c",
         reviewStatus: "reviewed",
         notes: "",
         size: 200,
@@ -87,7 +87,7 @@ function project(): TracepackProject {
         importedAt:
           "2026-08-26T10:20:00Z",
         contentHash:
-          "a".repeat(64),
+          "29d1283686193dc1461a7deac4f53d9bc5402a28b95d854f69e94986756fd0a9",
         reviewStatus: "reviewed",
         notes: "",
         size: 100,
@@ -95,6 +95,75 @@ function project(): TracepackProject {
       },
     ],
   };
+}
+
+function projectFiles(): Map<string, Blob> {
+  return new Map([
+    [
+      "evidence-b",
+      new Blob(
+        ["image-bytes"],
+        {
+          type: "image/jpeg",
+        },
+      ),
+    ],
+    [
+      "evidence-a",
+      new Blob(
+        ["pdf-bytes"],
+        {
+          type: "application/pdf",
+        },
+      ),
+    ],
+  ]);
+}
+
+function packSnapshotToAttestationSubject(
+  snapshot:
+    Parameters<
+      typeof packSnapshotToAttestationSubjectWithFiles
+    >[0],
+) {
+  return packSnapshotToAttestationSubjectWithFiles(
+    snapshot,
+    projectFiles(),
+  );
+}
+
+function createPackAttestationStatement(
+  snapshot:
+    Parameters<
+      typeof createPackAttestationStatementWithFiles
+    >[0],
+  options:
+    Parameters<
+      typeof createPackAttestationStatementWithFiles
+    >[2],
+) {
+  return createPackAttestationStatementWithFiles(
+    snapshot,
+    projectFiles(),
+    options,
+  );
+}
+
+function createPackAttestationPolicy(
+  snapshot:
+    Parameters<
+      typeof createPackAttestationPolicyWithFiles
+    >[0],
+  requirements:
+    Parameters<
+      typeof createPackAttestationPolicyWithFiles
+    >[2],
+) {
+  return createPackAttestationPolicyWithFiles(
+    snapshot,
+    projectFiles(),
+    requirements,
+  );
 }
 
 async function signedEnvelope(
@@ -514,8 +583,8 @@ describe(
           project();
 
         after.evidence[0]!
-          .contentHash =
-          "f".repeat(64);
+          .title =
+          "Checkout photos updated";
 
         const beforeStatement =
           await createPackAttestationStatement(
@@ -809,8 +878,8 @@ describe(
           project();
 
         after.evidence[0]!
-          .contentHash =
-          "f".repeat(64);
+          .title =
+          "Checkout photos updated";
 
         const beforeSnapshot =
           createPackSnapshot(
@@ -1142,6 +1211,115 @@ describe(
             value: "original",
           },
         });
+      },
+    );
+
+    it(
+      "rejects an attestation subject when included evidence bytes are missing",
+      async () => {
+        const files =
+          projectFiles();
+
+        files.delete(
+          "evidence-a",
+        );
+
+        await expect(
+          packSnapshotToAttestationSubjectWithFiles(
+            createPackSnapshot(
+              project(),
+              1,
+            ),
+            files,
+          ),
+        ).rejects.toThrow(
+          "Missing evidence bytes for included item: evidence-a",
+        );
+      },
+    );
+
+    it(
+      "rejects an attestation subject when evidence bytes do not match contentHash",
+      async () => {
+        const files =
+          projectFiles();
+
+        files.set(
+          "evidence-b",
+          new Blob(
+            ["tampered-image-bytes"],
+            {
+              type:
+                "image/jpeg",
+            },
+          ),
+        );
+
+        await expect(
+          packSnapshotToAttestationSubjectWithFiles(
+            createPackSnapshot(
+              project(),
+              1,
+            ),
+            files,
+          ),
+        ).rejects.toThrow(
+          "Evidence bytes do not match contentHash for included item: evidence-b",
+        );
+      },
+    );
+
+    it(
+      "accepts an attestation subject when every included blob matches contentHash",
+      async () => {
+        const subject =
+          await packSnapshotToAttestationSubjectWithFiles(
+            createPackSnapshot(
+              project(),
+              1,
+            ),
+            projectFiles(),
+          );
+
+        expect(
+          subject.kind,
+        ).toBe(
+          "tracepack-pack",
+        );
+      },
+    );
+
+    it(
+      "does not require bytes for excluded evidence",
+      async () => {
+        const source =
+          project();
+
+        source.evidence[0]!
+          .reviewStatus =
+          "excluded";
+
+        const files =
+          projectFiles();
+
+        files.delete(
+          "evidence-b",
+        );
+
+        const subject =
+          await packSnapshotToAttestationSubjectWithFiles(
+            createPackSnapshot(
+              source,
+              1,
+            ),
+            files,
+          );
+
+        expect(
+          subject.kind,
+        ).toBe(
+          "tracepack-pack",
+        );
       },
     );
 

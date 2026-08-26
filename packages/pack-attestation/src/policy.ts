@@ -9,10 +9,12 @@ import type {
 
 import {
   packSnapshotToAttestationSubject,
+  type PackEvidenceFiles,
 } from "./subject.js";
 
 export async function createPackAttestationPolicy(
   snapshot: TracepackPackSnapshotV1,
+  files: PackEvidenceFiles,
   requirements: AttestationRequirementV1[],
 ): Promise<MultiPartyAttestationPolicyV1> {
   return {
@@ -21,6 +23,7 @@ export async function createPackAttestationPolicy(
     subject:
       await packSnapshotToAttestationSubject(
         snapshot,
+        files,
       ),
     requirements,
   };

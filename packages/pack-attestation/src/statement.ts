@@ -10,6 +10,7 @@ import type {
 
 import {
   packSnapshotToAttestationSubject,
+  type PackEvidenceFiles,
 } from "./subject.js";
 
 export interface CreatePackAttestationStatementOptions {
@@ -23,11 +24,13 @@ export interface CreatePackAttestationStatementOptions {
 
 export async function createPackAttestationStatement(
   snapshot: TracepackPackSnapshotV1,
+  files: PackEvidenceFiles,
   options: CreatePackAttestationStatementOptions,
 ): Promise<AttestationStatementV1> {
   const subject =
     await packSnapshotToAttestationSubject(
       snapshot,
+      files,
     );
 
   return {
