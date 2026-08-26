@@ -655,6 +655,52 @@ describe(
   },
 );
 
+
+describe(
+  "empty attestation policy handling",
+  () => {
+    it(
+      "fails closed when requirements are empty",
+      () => {
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+
+              subject: {
+                kind:
+                  "tracepack-pack",
+
+                digest: {
+                  algorithm:
+                    "sha256",
+
+                  value:
+                    PACK_DIGEST,
+                },
+
+                pack_version: 4,
+              },
+
+              requirements: [],
+            },
+            [],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements,
+        ).toEqual([]);
+      },
+    );
+  },
+);
+
+
 describe(
   "multi-party signer identity uniqueness",
   () => {

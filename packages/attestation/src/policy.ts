@@ -20,6 +20,14 @@ export function evaluateAttestationPolicy(
   verificationResults:
     AttestationVerificationResultV1[],
 ): AttestationPolicyResultV1 {
+  if (policy.requirements.length === 0) {
+    return {
+      satisfied: false,
+      requirements: [],
+    };
+  }
+
+
   const requirements =
     policy.requirements.map(
       (requirement) => {
