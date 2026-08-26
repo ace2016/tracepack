@@ -502,6 +502,29 @@ describe(
           "Value cannot be represented as canonical JSON.",
         );
 
+        let proxyReads = 0;
+
+        const proxy = new Proxy(
+          {
+            approval: true,
+          },
+          {
+            ownKeys() {
+              proxyReads += 1;
+
+              return proxyReads === 1
+                ? ["approval"]
+                : [];
+            },
+          },
+        );
+
+        expect(
+          canonicalizeJson(proxy),
+        ).toBe(
+          '{"approval":true}',
+        );
+
         const nonEnumerableObject:
           Record<string, unknown> = {};
 
@@ -1394,6 +1417,53 @@ describe(
 describe(
   "multi-party signer identity uniqueness",
   () => {
+    it(
+      "reuses the validated signer threshold during evaluation",
+      () => {
+        let reads = 0;
+
+        const dynamicRequirement = {
+          id: "approval",
+          statement_type: "approval",
+          get minimum_signers() {
+            reads += 1;
+
+            return reads <= 1
+              ? 1
+              : 0;
+          },
+        };
+
+        const policy = {
+          subject: {
+            kind: "tracepack-pack",
+            digest: {
+              algorithm: "sha256",
+              value: "a".repeat(64),
+            },
+            pack_version: 1,
+          },
+          requirements: [
+            dynamicRequirement,
+          ],
+        };
+
+        const result =
+          evaluateAttestationPolicy(
+            policy as never,
+            [],
+          );
+
+        expect(
+          result.requirements[0]?.required,
+        ).toBe(1);
+
+        expect(
+          result.requirements[0]?.satisfied,
+        ).toBe(false);
+      },
+    );
+
     it(
       "does not count one verified identity twice under different party IDs",
       () => {

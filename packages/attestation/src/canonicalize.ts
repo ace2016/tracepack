@@ -48,21 +48,21 @@ function assertValidUnicodeString(
   }
 }
 
-function assertCanonicalJsonValue(
+function snapshotCanonicalJsonValue(
   value: unknown,
   seen: Set<object> = new Set(),
-): void {
+): unknown {
   if (value === null) {
-    return;
+    return null;
   }
 
   if (typeof value === "string") {
     assertValidUnicodeString(value);
-    return;
+    return value;
   }
 
   if (typeof value === "boolean") {
-    return;
+    return value;
   }
 
   if (typeof value === "number") {
@@ -72,7 +72,7 @@ function assertCanonicalJsonValue(
       );
     }
 
-    return;
+    return value;
   }
 
   if (Array.isArray(value)) {
@@ -90,13 +90,10 @@ function assertCanonicalJsonValue(
         continue;
       }
 
-      if (typeof key !== "string") {
-        throw new TypeError(
-          "Value cannot be represented as canonical JSON.",
-        );
-      }
-
-      if (!/^(0|[1-9][0-9]*)$/.test(key)) {
+      if (
+        typeof key !== "string" ||
+        !/^(0|[1-9][0-9]*)$/.test(key)
+      ) {
         throw new TypeError(
           "Value cannot be represented as canonical JSON.",
         );
@@ -118,17 +115,13 @@ function assertCanonicalJsonValue(
 
     seen.add(value);
 
+    const snapshot: unknown[] = [];
+
     for (
       let index = 0;
       index < value.length;
       index += 1
     ) {
-      if (!(index in value)) {
-        throw new TypeError(
-          "Value cannot be represented as canonical JSON.",
-        );
-      }
-
       const descriptor =
         Object.getOwnPropertyDescriptor(
           value,
@@ -137,6 +130,7 @@ function assertCanonicalJsonValue(
 
       if (
         descriptor === undefined ||
+        !descriptor.enumerable ||
         "get" in descriptor ||
         "set" in descriptor
       ) {
@@ -145,14 +139,16 @@ function assertCanonicalJsonValue(
         );
       }
 
-      assertCanonicalJsonValue(
-        descriptor.value,
-        seen,
+      snapshot.push(
+        snapshotCanonicalJsonValue(
+          descriptor.value,
+          seen,
+        ),
       );
     }
 
     seen.delete(value);
-    return;
+    return snapshot;
   }
 
   if (
@@ -180,12 +176,19 @@ function assertCanonicalJsonValue(
     const ownKeys =
       Reflect.ownKeys(value);
 
+    const entries:
+      Array<[string, unknown]> = [];
+
+    seen.add(value);
+
     for (const key of ownKeys) {
       if (typeof key !== "string") {
         throw new TypeError(
           "Value cannot be represented as canonical JSON.",
         );
       }
+
+      assertValidUnicodeString(key);
 
       const descriptor =
         Object.getOwnPropertyDescriptor(
@@ -203,39 +206,26 @@ function assertCanonicalJsonValue(
           "Value cannot be represented as canonical JSON.",
         );
       }
-    }
 
-    seen.add(value);
-
-    for (
-      const key of Object.keys(value)
-    ) {
-      assertValidUnicodeString(key);
-
-      const descriptor =
-        Object.getOwnPropertyDescriptor(
-          value,
-          key,
-        );
-
-      if (
-        descriptor === undefined ||
-        "get" in descriptor ||
-        "set" in descriptor
-      ) {
-        throw new TypeError(
-          "Value cannot be represented as canonical JSON.",
-        );
-      }
-
-      assertCanonicalJsonValue(
-        descriptor.value,
-        seen,
-      );
+      entries.push([
+        key,
+        snapshotCanonicalJsonValue(
+          descriptor.value,
+          seen,
+        ),
+      ]);
     }
 
     seen.delete(value);
-    return;
+
+    const snapshot:
+      Record<string, unknown> = {};
+
+    for (const [key, entryValue] of entries) {
+      snapshot[key] = entryValue;
+    }
+
+    return snapshot;
   }
 
   throw new TypeError(
@@ -246,10 +236,11 @@ function assertCanonicalJsonValue(
 export function canonicalizeJson(
   value: unknown,
 ): string {
-  assertCanonicalJsonValue(value);
+  const snapshot =
+    snapshotCanonicalJsonValue(value);
 
   const result =
-    canonicalize(value);
+    canonicalize(snapshot);
 
   if (result === undefined) {
     throw new TypeError(

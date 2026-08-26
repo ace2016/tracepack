@@ -44,50 +44,63 @@ export function evaluateAttestationPolicy(
   const requirements =
     policy.requirements.map(
       (requirement) => {
+        const requirementId =
+          requirement.id;
+
+        const minimumSigners =
+          requirement.minimum_signers;
+
+        const role =
+          requirement.role;
+
+        const requireIdentityBinding =
+          requirement.require_identity_binding;
+
+        const statementType =
+          requirement.statement_type;
+
         if (
           !Number.isInteger(
-            requirement.minimum_signers,
+            minimumSigners,
           ) ||
-          requirement.minimum_signers < 1
+          minimumSigners < 1
         ) {
           return {
             requirement_id:
-              requirement.id,
+              requirementId,
             satisfied: false,
             required:
-              requirement.minimum_signers,
+              minimumSigners,
             matched_parties: [],
           };
         }
 
         if (
-          requirement.role !== undefined &&
-          requirement.role.length === 0
+          role !== undefined &&
+          role.length === 0
         ) {
           return {
             requirement_id:
-              requirement.id,
+              requirementId,
             satisfied: false,
             required:
-              requirement.minimum_signers,
+              minimumSigners,
             matched_parties: [],
           };
         }
 
         if (
-          requirement
-            .require_identity_binding !==
-              undefined &&
-          typeof requirement
-            .require_identity_binding !==
-              "boolean"
+          requireIdentityBinding !==
+            undefined &&
+          typeof requireIdentityBinding !==
+            "boolean"
         ) {
           return {
             requirement_id:
-              requirement.id,
+              requirementId,
             satisfied: false,
             required:
-              requirement.minimum_signers,
+              minimumSigners,
             matched_parties: [],
           };
         }
@@ -116,22 +129,21 @@ export function evaluateAttestationPolicy(
 
           if (
             statement.statement.type !==
-            requirement.statement_type
+            statementType
           ) {
             continue;
           }
 
           if (
-            requirement.role !== undefined &&
+            role !== undefined &&
             statement.signer.role !==
-              requirement.role
+              role
           ) {
             continue;
           }
 
           if (
-            requirement
-              .require_identity_binding ===
+            requireIdentityBinding ===
               true &&
             result.identity_binding !==
               "matched"
@@ -167,9 +179,9 @@ export function evaluateAttestationPolicy(
             requirement.id,
           satisfied:
             matchedParties.length >=
-            requirement.minimum_signers,
+            minimumSigners,
           required:
-            requirement.minimum_signers,
+            minimumSigners,
           matched_parties:
             matchedParties,
         };
