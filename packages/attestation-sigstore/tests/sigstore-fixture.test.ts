@@ -92,6 +92,48 @@ describe(
   "real Sigstore GitHub Actions fixture",
   () => {
     it(
+      "preserves the Rekor v1 global and shard-local log indices",
+      () => {
+        const entry =
+          bundle.verificationMaterial
+            .tlogEntries[0];
+
+        const proof =
+          entry.inclusionProof;
+
+        /*
+         * Rekor v1 exposes two different indices:
+         *
+         * - entry.logIndex is the global Rekor log index.
+         * - inclusionProof.logIndex is the index inside the
+         *   Merkle-tree shard authenticated by the proof.
+         *
+         * They are therefore not required to be equal. A
+         * freshly generated GitHub OIDC/Sigstore fixture
+         * exhibits this same structure and passes Sigstore
+         * cryptographic verification.
+         */
+        expect(
+          typeof entry.logIndex,
+        ).toBe("string");
+
+        expect(
+          typeof proof.logIndex,
+        ).toBe("string");
+
+        expect(
+          typeof proof.treeSize,
+        ).toBe("string");
+
+        expect(
+          BigInt(proof.logIndex),
+        ).toBeLessThan(
+          BigInt(proof.treeSize),
+        );
+      },
+    );
+
+    it(
       "verifies the original payload cryptographically",
       async () => {
         const result =
