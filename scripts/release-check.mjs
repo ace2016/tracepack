@@ -97,6 +97,94 @@ try {
     fail(`expected ${packages.length} archives, found ${archives.length}`);
   }
 
+  const requiredArchiveEntries = {
+    attestation: [
+      "package/package.json",
+      "package/LICENSE",
+      "package/README.md",
+      "package/SPEC.md",
+      "package/schema/tracepack-attestation.v1.json",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ],
+    "attestation-sigstore": [
+      "package/package.json",
+      "package/LICENSE",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ],
+    "pack-attestation": [
+      "package/package.json",
+      "package/LICENSE",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ],
+  };
+
+  for (const [folder, requiredEntries] of Object.entries(requiredArchiveEntries)) {
+    const expectedArchivePrefix =
+      folder === "attestation"
+        ? "tracepack-attestation-0."
+        : `tracepack-${folder}-`;
+
+    const archiveName = archives.find(
+      (name) =>
+        name.startsWith(
+          expectedArchivePrefix,
+        ) &&
+        name.endsWith(".tgz"),
+    );
+
+    if (!archiveName) {
+      fail(`missing archive for @tracepack/${folder}`);
+    }
+
+    const archivePath = join(
+      releaseDir,
+      archiveName,
+    );
+
+    const contents = execFileSync(
+      "tar",
+      ["-tzf", archivePath],
+      {
+        encoding: "utf8",
+      },
+    )
+      .split("\n")
+      .filter(Boolean);
+
+    const contentSet =
+      new Set(contents);
+
+    for (const entry of requiredEntries) {
+      if (!contentSet.has(entry)) {
+        fail(
+          `@tracepack/${folder} archive is missing ${entry}`,
+        );
+      }
+    }
+
+    const forbiddenPrefixes = [
+      "package/src/",
+      "package/tests/",
+      "package/scripts/",
+    ];
+
+    for (const entry of contents) {
+      if (
+        forbiddenPrefixes.some(
+          (prefix) =>
+            entry.startsWith(prefix),
+        )
+      ) {
+        fail(
+          `@tracepack/${folder} archive contains development file ${entry}`,
+        );
+      }
+    }
+  }
+
   run(process.execPath, [join(root, "packages", "cli", "dist", "cli.js"), "--help"]);
   console.log(`Release candidate passed. Reviewed archives were created in ${releaseDir}`);
 } catch (error) {
