@@ -60,6 +60,9 @@ jobs:
           pnpm --filter @tracepack/evidence-sdk pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
           pnpm --filter @tracepack/integration pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
           pnpm --filter @tracepack/cli pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/attestation pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/attestation-sigstore pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
+          pnpm --filter @tracepack/pack-attestation pack --pack-destination "$GITHUB_WORKSPACE/release-packages"
 
       - name: Test the archives in a clean project
         run: |
@@ -70,8 +73,11 @@ jobs:
             ../release-packages/tracepack-template-engine-*.tgz \
             ../release-packages/tracepack-evidence-sdk-*.tgz \
             ../release-packages/tracepack-integration-*.tgz \
-            ../release-packages/tracepack-cli-*.tgz
-          node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk'), import('@tracepack/integration')]).then(() => console.log('SDK imports passed'))"
+            ../release-packages/tracepack-cli-*.tgz \
+            ../release-packages/tracepack-attestation-*.tgz \
+            ../release-packages/tracepack-attestation-sigstore-*.tgz \
+            ../release-packages/tracepack-pack-attestation-*.tgz
+          node --input-type=module -e "Promise.all([import('@tracepack/evidence-core'), import('@tracepack/template-engine'), import('@tracepack/evidence-sdk'), import('@tracepack/integration'), import('@tracepack/attestation'), import('@tracepack/attestation-sigstore'), import('@tracepack/pack-attestation')]).then(() => console.log('Developer package imports passed'))"
           ./node_modules/.bin/tracepack --help
 
       - uses: sigstore/cosign-installer@v3.10.0
@@ -111,7 +117,10 @@ jobs:
             release-packages/tracepack-template-engine-*.tgz \
             release-packages/tracepack-evidence-sdk-*.tgz \
             release-packages/tracepack-integration-*.tgz \
-            release-packages/tracepack-cli-*.tgz
+            release-packages/tracepack-cli-*.tgz \
+            release-packages/tracepack-attestation-*.tgz \
+            release-packages/tracepack-attestation-sigstore-*.tgz \
+            release-packages/tracepack-pack-attestation-*.tgz
           do
             metadata=$(tar -xOzf "./$package" package/package.json)
             package_name=$(printf '%s' "$metadata" | node -e "let s='' ; process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).name))")

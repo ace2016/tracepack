@@ -190,6 +190,9 @@ importers:
         specifier: ^4.1.5
         version: 4.4.3
     devDependencies:
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -209,6 +212,12 @@ importers:
         specifier: ^5.0.0
         version: 5.0.0
     devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
@@ -365,6 +374,9 @@ importers:
         specifier: workspace:*
         version: link:../evidence-core
     devDependencies:
+      esbuild:
+        specifier: ^0.28.1
+        version: 0.28.1
       typescript:
         specifier: ^5.9.2
         version: 5.9.3

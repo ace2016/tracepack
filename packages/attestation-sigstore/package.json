@@ -1,17 +1,21 @@
 {
   "name": "@tracepack/attestation-sigstore",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.1",
   "description": "Sigstore signing and verification runtime for TracePack attestations.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
     "@sigstore/bundle": "^5.0.0",
@@ -19,11 +23,33 @@
     "sigstore": "^5.0.0"
   },
   "devDependencies": {
+    "@types/node": "^24.13.3",
+    "esbuild": "^0.28.1",
     "tsx": "^4.23.12",
     "typescript": "^5.9.2",
     "vitest": "^3.2.7"
   },
   "engines": {
     "node": "^22.22.2 || ^24.15.0 || >=26"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ace2016/tracepack.git",
+    "directory": "packages/attestation-sigstore"
+  },
+  "homepage": "https://dev.tracepack.org/",
+  "bugs": {
+    "url": "https://github.com/ace2016/tracepack/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "LICENSE"
+  ]
 }

@@ -10,6 +10,9 @@ const packages = [
   "evidence-sdk",
   "integration",
   "cli",
+  "attestation",
+  "attestation-sigstore",
+  "pack-attestation",
 ];
 const releaseTag = process.env.TRACEPACK_RELEASE_TAG;
 const releaseTagMatch = releaseTag?.match(
@@ -60,10 +63,25 @@ try {
     if (!manifest.homepage || !manifest.bugs?.url) fail(`${manifest.name} is missing public support links`);
   }
 
-  const interchange = JSON.parse(
-    readFileSync(join(root, "packages", "evidence-interchange", "package.json"), "utf8"),
-  );
-  if (interchange.private !== true) fail("evidence-interchange must remain internal");
+  const internalPackages = [
+    "document-engine",
+    "evidence-interchange",
+    "export-engine",
+    "storage",
+  ];
+
+  for (const folder of internalPackages) {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(root, "packages", folder, "package.json"),
+        "utf8",
+      ),
+    );
+
+    if (manifest.private !== true) {
+      fail(`${manifest.name} must remain internal`);
+    }
+  }
 
   pnpm(["run", "build:sdk"]);
   pnpm(["-r", "typecheck"]);

@@ -1,18 +1,22 @@
 {
   "name": "@tracepack/attestation",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.2.1",
   "description": "Portable TracePack attestation contract for binding independently verifiable statements and signatures to immutable pack digests.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./schema/tracepack-attestation.v1.json": "./schema/tracepack-attestation.v1.json"
   },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
     "canonicalize": "^3.0.0",
@@ -20,9 +24,32 @@
   },
   "devDependencies": {
     "typescript": "^5.9.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "esbuild": "^0.28.1"
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ace2016/tracepack.git",
+    "directory": "packages/attestation"
+  },
+  "homepage": "https://dev.tracepack.org/",
+  "bugs": {
+    "url": "https://github.com/ace2016/tracepack/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "schema",
+    "README.md",
+    "LICENSE"
+  ]
 }
