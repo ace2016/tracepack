@@ -337,6 +337,29 @@ describe(
 
 
 describe(
+  "portable SHA-256 runtime",
+  () => {
+    it(
+      "hashes through the runtime Web Crypto abstraction",
+      async () => {
+        const digest =
+          await computeAttestationStatementHash(
+            statement(
+              "portable-runtime",
+              "reviewer",
+              "review.approval",
+            ),
+          );
+
+        expect(digest).toMatch(
+          /^[0-9a-f]{64}$/,
+        );
+      },
+    );
+  },
+);
+
+describe(
   "canonical JSON input validation",
   () => {
     it(

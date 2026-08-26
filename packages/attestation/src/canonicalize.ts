@@ -136,6 +136,48 @@ export function attestationStatementBytes(
   );
 }
 
+async function subtleCrypto():
+  Promise<SubtleCrypto> {
+  if (
+    globalThis.crypto?.subtle
+  ) {
+    return globalThis.crypto.subtle;
+  }
+
+  /*
+   * Node 18 does not expose global Web Crypto
+   * consistently across supported execution
+   * modes. Keep the normal browser/runtime path
+   * free of a Node-only static import and load the
+   * Node implementation only as a fallback.
+   */
+  try {
+    const loadNodeCrypto =
+      Function(
+        "return import('node:crypto')",
+      ) as () => Promise<{
+        webcrypto?: {
+          subtle?: SubtleCrypto;
+        };
+      }>;
+
+    const nodeCrypto =
+      await loadNodeCrypto();
+
+    if (
+      nodeCrypto.webcrypto?.subtle
+    ) {
+      return nodeCrypto.webcrypto.subtle;
+    }
+  } catch {
+    // Fall through to the explicit runtime error.
+  }
+
+  throw new Error(
+    "Web Crypto SHA-256 is unavailable in this runtime.",
+  );
+}
+
 export async function sha256Hex(
   input: Uint8Array | string,
 ): Promise<string> {
@@ -144,7 +186,10 @@ export async function sha256Hex(
       ? new TextEncoder().encode(input)
       : input;
 
-  const digest = await crypto.subtle.digest(
+  const subtle =
+    await subtleCrypto();
+
+  const digest = await subtle.digest(
     "SHA-256",
     bytes as BufferSource,
   );
