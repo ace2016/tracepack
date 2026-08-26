@@ -1418,6 +1418,66 @@ describe(
   "multi-party signer identity uniqueness",
   () => {
     it(
+      "does not trust an overridden requirements map method",
+      () => {
+        class MaliciousRequirements
+          extends Array<{
+            id: string;
+            statement_type: string;
+            minimum_signers: number;
+          }> {
+          override map(): never[] {
+            return [];
+          }
+        }
+
+        const requirements =
+          new MaliciousRequirements();
+
+        requirements.push({
+          id: "approval",
+          statement_type:
+            "approval",
+          minimum_signers: 1,
+        });
+
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+              subject: {
+                kind:
+                  "tracepack-pack",
+                digest: {
+                  algorithm:
+                    "sha256",
+                  value:
+                    "a".repeat(64),
+                },
+                pack_version: 1,
+              },
+              requirements,
+            },
+            [],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements,
+        ).toHaveLength(1);
+
+        expect(
+          result.requirements[0]
+            ?.satisfied,
+        ).toBe(false);
+      },
+    );
+
+    it(
       "reuses the validated signer threshold during evaluation",
       () => {
         let reads = 0;

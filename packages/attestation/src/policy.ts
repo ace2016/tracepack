@@ -20,29 +20,106 @@ export function evaluateAttestationPolicy(
   verificationResults:
     AttestationVerificationResultV1[],
 ): AttestationPolicyResultV1 {
-  if (policy.requirements.length === 0) {
+  const sourceRequirements =
+    policy.requirements;
+
+  const lengthDescriptor =
+    Object.getOwnPropertyDescriptor(
+      sourceRequirements,
+      "length",
+    );
+
+  if (
+    lengthDescriptor === undefined ||
+    "get" in lengthDescriptor ||
+    "set" in lengthDescriptor ||
+    !Number.isSafeInteger(
+      lengthDescriptor.value,
+    ) ||
+    lengthDescriptor.value < 1
+  ) {
     return {
       satisfied: false,
       requirements: [],
     };
   }
 
+  const requirementCount =
+    lengthDescriptor.value;
+
+  const requirementSnapshots: Array<{
+    id: string;
+    statement_type: string;
+    role?: string;
+    minimum_signers: number;
+    require_identity_binding?: boolean;
+  }> = [];
+
   for (
     let index = 0;
-    index < policy.requirements.length;
+    index < requirementCount;
     index += 1
   ) {
-    if (!(index in policy.requirements)) {
+    const descriptor =
+      Object.getOwnPropertyDescriptor(
+        sourceRequirements,
+        String(index),
+      );
+
+    if (
+      descriptor === undefined ||
+      !descriptor.enumerable ||
+      "get" in descriptor ||
+      "set" in descriptor
+    ) {
       return {
         satisfied: false,
         requirements: [],
       };
     }
+
+    const requirement =
+      descriptor.value;
+
+    if (
+      typeof requirement !== "object" ||
+      requirement === null
+    ) {
+      return {
+        satisfied: false,
+        requirements: [],
+      };
+    }
+
+    const requirementId =
+      requirement.id;
+
+    const statementType =
+      requirement.statement_type;
+
+    const role =
+      requirement.role;
+
+    const minimumSigners =
+      requirement.minimum_signers;
+
+    const requireIdentityBinding =
+      requirement.require_identity_binding;
+
+    requirementSnapshots.push({
+      id: requirementId,
+      statement_type:
+        statementType,
+      role,
+      minimum_signers:
+        minimumSigners,
+      require_identity_binding:
+        requireIdentityBinding,
+    });
   }
 
-
   const requirements =
-    policy.requirements.map(
+    requirementSnapshots.map(
       (requirement) => {
         const requirementId =
           requirement.id;
@@ -77,7 +154,10 @@ export function evaluateAttestationPolicy(
 
         if (
           role !== undefined &&
-          role.length === 0
+          (
+            typeof role !== "string" ||
+            role.length === 0
+          )
         ) {
           return {
             requirement_id:
@@ -176,7 +256,7 @@ export function evaluateAttestationPolicy(
 
         return {
           requirement_id:
-            requirement.id,
+            requirementId,
           satisfied:
             matchedParties.length >=
             minimumSigners,
