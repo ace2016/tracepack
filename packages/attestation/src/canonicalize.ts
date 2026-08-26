@@ -3,15 +3,65 @@ import type {
   AttestationStatementV1,
 } from "./types";
 
+function assertValidUnicodeString(
+  value: string,
+): void {
+  for (
+    let index = 0;
+    index < value.length;
+    index += 1
+  ) {
+    const code =
+      value.charCodeAt(index);
+
+    if (
+      code >= 0xd800 &&
+      code <= 0xdbff
+    ) {
+      const next =
+        value.charCodeAt(
+          index + 1,
+        );
+
+      if (
+        !Number.isFinite(next) ||
+        next < 0xdc00 ||
+        next > 0xdfff
+      ) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
+      index += 1;
+      continue;
+    }
+
+    if (
+      code >= 0xdc00 &&
+      code <= 0xdfff
+    ) {
+      throw new TypeError(
+        "Value cannot be represented as canonical JSON.",
+      );
+    }
+  }
+}
+
 function assertCanonicalJsonValue(
   value: unknown,
   seen: Set<object> = new Set(),
 ): void {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
-  ) {
+  if (value === null) {
+    return;
+  }
+
+  if (typeof value === "string") {
+    assertValidUnicodeString(value);
+    return;
+  }
+
+  if (typeof value === "boolean") {
     return;
   }
 

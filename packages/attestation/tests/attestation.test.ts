@@ -421,6 +421,32 @@ describe(
           "Value cannot be represented as canonical JSON.",
         );
 
+        expect(
+          () =>
+            canonicalizeJson({
+              value: "\ud800",
+            }),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          () =>
+            canonicalizeJson({
+              value: "\udc00",
+            }),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          canonicalizeJson({
+            value: "\ud83d\ude00",
+          }),
+        ).toBe(
+          '{"value":"😀"}',
+        );
+
         const circular:
           Record<string, unknown> = {};
 
