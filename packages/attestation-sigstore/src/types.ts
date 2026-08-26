@@ -10,8 +10,6 @@ export interface SigstoreIdentityPolicy {
 }
 
 export interface SigstoreSigningOptions {
-  fulcioURL?: string;
-  rekorURL?: string;
   tsaServerURL?: string;
   tlogUpload?: boolean;
   identityToken?: string;

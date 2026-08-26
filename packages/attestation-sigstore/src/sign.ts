@@ -49,8 +49,6 @@ export async function signWithSigstore(
   const bundle = await sign(
     Buffer.from(payload),
     {
-      fulcioURL: options.fulcioURL,
-      rekorURL: options.rekorURL,
       tsaServerURL:
         options.tsaServerURL,
       tlogUpload:

@@ -177,13 +177,32 @@ function assertCanonicalJsonValue(
       );
     }
 
-    if (
-      Object.getOwnPropertySymbols(value)
-        .length > 0
-    ) {
-      throw new TypeError(
-        "Value cannot be represented as canonical JSON.",
-      );
+    const ownKeys =
+      Reflect.ownKeys(value);
+
+    for (const key of ownKeys) {
+      if (typeof key !== "string") {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
+      const descriptor =
+        Object.getOwnPropertyDescriptor(
+          value,
+          key,
+        );
+
+      if (
+        descriptor === undefined ||
+        !descriptor.enumerable ||
+        "get" in descriptor ||
+        "set" in descriptor
+      ) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
     }
 
     seen.add(value);

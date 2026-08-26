@@ -502,6 +502,27 @@ describe(
           "Value cannot be represented as canonical JSON.",
         );
 
+        const nonEnumerableObject:
+          Record<string, unknown> = {};
+
+        Object.defineProperty(
+          nonEnumerableObject,
+          "approval",
+          {
+            value: true,
+            enumerable: false,
+          },
+        );
+
+        expect(
+          () =>
+            canonicalizeJson(
+              nonEnumerableObject,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
         let getterReads = 0;
 
         const accessorObject:
