@@ -3,7 +3,7 @@ import type {
   AttestationVerificationStageId,
   AttestationVerificationStageStatus,
   AttestationVerificationStageV1,
-} from "./types";
+} from "./types.js";
 
 export const VERIFICATION_STAGE_ORDER:
   AttestationVerificationStageId[] = [

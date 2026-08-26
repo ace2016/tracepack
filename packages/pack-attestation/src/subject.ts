@@ -56,8 +56,19 @@ export async function packSnapshotToAttestationSubject(
   snapshot: TracepackPackSnapshotV1,
   files: PackEvidenceFiles,
 ): Promise<AttestationSubjectV1> {
+  /*
+   * Freeze the logical subject synchronously before
+   * the first await. This prevents caller mutation
+   * during blob hashing from changing the snapshot
+   * after some evidence has already been verified.
+   */
+  const frozenSnapshot =
+    JSON.parse(
+      canonicalizeJson(snapshot),
+    ) as TracepackPackSnapshotV1;
+
   await verifyPackEvidenceBytes(
-    snapshot,
+    frozenSnapshot,
     files,
   );
 
@@ -67,10 +78,10 @@ export async function packSnapshotToAttestationSubject(
       algorithm: "sha256",
       value:
         await computePackSnapshotDigest(
-          snapshot,
+          frozenSnapshot,
         ),
     },
     pack_version:
-      snapshot.pack_version,
+      frozenSnapshot.pack_version,
   };
 }

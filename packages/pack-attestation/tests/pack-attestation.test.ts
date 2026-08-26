@@ -1324,6 +1324,80 @@ describe(
     );
 
     it(
+      "uses one fixed snapshot across asynchronous evidence verification",
+      async () => {
+        const snapshot =
+          createPackSnapshot(
+            project(),
+            1,
+          );
+
+        let releaseRead:
+          (() => void) | undefined;
+
+        const readGate =
+          new Promise<void>(
+            (resolve) => {
+              releaseRead =
+                resolve;
+            },
+          );
+
+        const files =
+          projectFiles();
+
+        const original =
+          files.get(
+            "evidence-b",
+          )!;
+
+        const delayedBlob = {
+          arrayBuffer:
+            async () => {
+              await readGate;
+              return original.arrayBuffer();
+            },
+        } as Blob;
+
+        files.set(
+          "evidence-b",
+          delayedBlob,
+        );
+
+        const pending =
+          packSnapshotToAttestationSubjectWithFiles(
+            snapshot,
+            files,
+          );
+
+        snapshot.pack_version = 99;
+        snapshot.evidence[0]!
+          .content_hash =
+          "f".repeat(64);
+
+        releaseRead!();
+
+        const subject =
+          await pending;
+
+        expect(
+          subject.pack_version,
+        ).toBe(1);
+
+        expect(
+          subject.digest.value,
+        ).toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(
+              project(),
+              1,
+            ),
+          ),
+        );
+      },
+    );
+
+    it(
       "rejects invalid pack versions",
       () => {
         for (

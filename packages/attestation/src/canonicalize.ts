@@ -1,7 +1,7 @@
 import canonicalize from "canonicalize";
 import type {
   AttestationStatementV1,
-} from "./types";
+} from "./types.js";
 
 function assertValidUnicodeString(
   value: string,

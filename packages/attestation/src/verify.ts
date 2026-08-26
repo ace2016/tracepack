@@ -1,21 +1,21 @@
 import {
   attestationStatementBytes,
   computeAttestationStatementHash,
-} from "./canonicalize";
+} from "./canonicalize.js";
 import type {
   AttestationVerificationReportV1,
   AttestationVerificationResultV1,
   JsonObject,
   SignedAttestationV1,
   VerifiedSigstoreIdentityV1,
-} from "./types";
+} from "./types.js";
 import {
   safeParseSignedAttestation,
-} from "./validate";
+} from "./validate.js";
 import {
   createVerificationReport,
   setVerificationStage,
-} from "./report";
+} from "./report.js";
 
 function markPreSigstoreStagesPassed(
   report: AttestationVerificationReportV1,

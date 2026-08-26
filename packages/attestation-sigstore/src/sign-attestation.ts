@@ -11,11 +11,11 @@ import type {
 
 import {
   signWithSigstore,
-} from "./sign";
+} from "./sign.js";
 
 import type {
   SigstoreSigningOptions,
-} from "./types";
+} from "./types.js";
 
 export async function signAttestationWithSigstore(
   statement: AttestationStatementV1,
