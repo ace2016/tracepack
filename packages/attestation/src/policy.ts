@@ -27,6 +27,19 @@ export function evaluateAttestationPolicy(
     };
   }
 
+  for (
+    let index = 0;
+    index < policy.requirements.length;
+    index += 1
+  ) {
+    if (!(index in policy.requirements)) {
+      return {
+        satisfied: false,
+        requirements: [],
+      };
+    }
+  }
+
 
   const requirements =
     policy.requirements.map(

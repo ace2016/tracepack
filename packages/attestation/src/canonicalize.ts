@@ -82,6 +82,40 @@ function assertCanonicalJsonValue(
       );
     }
 
+    const ownKeys =
+      Reflect.ownKeys(value);
+
+    for (const key of ownKeys) {
+      if (key === "length") {
+        continue;
+      }
+
+      if (typeof key !== "string") {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
+      if (!/^(0|[1-9][0-9]*)$/.test(key)) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+
+      const index =
+        Number(key);
+
+      if (
+        !Number.isSafeInteger(index) ||
+        index < 0 ||
+        index >= value.length
+      ) {
+        throw new TypeError(
+          "Value cannot be represented as canonical JSON.",
+        );
+      }
+    }
+
     seen.add(value);
 
     for (

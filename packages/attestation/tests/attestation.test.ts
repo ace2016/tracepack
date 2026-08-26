@@ -15,6 +15,7 @@ import {
 import type {
   AttestationStatementV1,
   AttestationVerificationResultV1,
+  MultiPartyAttestationPolicyV1,
   SignedAttestationV1,
 } from "../src";
 
@@ -459,6 +460,46 @@ describe(
           }),
         ).toBe(
           '{"value":"😀"}',
+        );
+
+        const extraArrayProperty:
+          unknown[] = [];
+
+        Object.assign(
+          extraArrayProperty,
+          {
+            approval: true,
+          },
+        );
+
+        expect(
+          () =>
+            canonicalizeJson(
+              extraArrayProperty,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        const symbolArray:
+          unknown[] = [];
+
+        Object.defineProperty(
+          symbolArray,
+          Symbol("approval"),
+          {
+            value: true,
+            enumerable: true,
+          },
+        );
+
+        expect(
+          () =>
+            canonicalizeJson(
+              symbolArray,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
         );
 
         const circular:
@@ -1162,6 +1203,50 @@ describe(
         expect(
           result.requirements[0]
             ?.matched_parties,
+        ).toEqual([]);
+      },
+    );
+  },
+);
+
+describe(
+  "sparse policy requirement handling",
+  () => {
+    it(
+      "fails closed for sparse requirement arrays",
+      () => {
+        const requirements =
+          new Array(1) as unknown as
+            MultiPartyAttestationPolicyV1[
+              "requirements"
+            ];
+
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+              subject: {
+                kind:
+                  "tracepack-pack",
+                digest: {
+                  algorithm:
+                    "sha256",
+                  value:
+                    PACK_DIGEST,
+                },
+              },
+              requirements,
+            },
+            [],
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements,
         ).toEqual([]);
       },
     );
