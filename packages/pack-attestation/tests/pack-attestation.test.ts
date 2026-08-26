@@ -30,7 +30,22 @@ function project(): TracepackProject {
       name: "Deposit dispute",
       version: "1.0.0",
       jurisdiction: "GB",
-      categories: [],
+      categories: [
+        {
+          id: "agreement",
+          name: "Agreement",
+          requirement: "optional",
+          description: "",
+          acceptedTypes: [],
+        },
+        {
+          id: "condition",
+          name: "Condition",
+          requirement: "optional",
+          description: "",
+          acceptedTypes: [],
+        },
+      ],
       exportSections: [],
     },
 
@@ -210,7 +225,7 @@ describe(
     );
 
     it(
-      "ignores mutable project timestamps and narrative fields",
+      "ignores mutable project timestamps",
       async () => {
         const before = project();
         const after = project();
@@ -218,17 +233,32 @@ describe(
         after.updatedAt =
           "2026-09-01T12:00:00Z";
 
-        after.summary =
-          "Edited working summary.";
-
-        after.desiredResolution =
-          "Edited working resolution.";
-
         expect(
           await computePackSnapshotDigest(
             createPackSnapshot(before, 1),
           ),
         ).toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(after, 1),
+          ),
+        );
+      },
+    );
+
+    it(
+      "changes the digest when rendered project summary changes",
+      async () => {
+        const before = project();
+        const after = project();
+
+        after.summary =
+          "Edited pack summary.";
+
+        expect(
+          await computePackSnapshotDigest(
+            createPackSnapshot(before, 1),
+          ),
+        ).not.toBe(
           await computePackSnapshotDigest(
             createPackSnapshot(after, 1),
           ),
@@ -253,6 +283,124 @@ describe(
           await computePackSnapshotDigest(
             createPackSnapshot(after, 1),
           ),
+        );
+      },
+    );
+
+    it(
+      "does not bind excluded evidence into the finalized pack snapshot",
+      async () => {
+        const before = project();
+        const after = project();
+
+        after.evidence[0]!.reviewStatus =
+          "excluded";
+
+        const excludedChanged =
+          project();
+
+        excludedChanged.evidence[0]!
+          .reviewStatus =
+          "excluded";
+
+        excludedChanged.evidence[0]!
+          .contentHash =
+          "f".repeat(64);
+
+        expect(
+          await computePackSnapshotDigest(
+            createPackSnapshot(after, 1),
+          ),
+        ).toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(
+              excludedChanged,
+              1,
+            ),
+          ),
+        );
+
+        expect(
+          await computePackSnapshotDigest(
+            createPackSnapshot(before, 1),
+          ),
+        ).not.toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(after, 1),
+          ),
+        );
+      },
+    );
+
+    it(
+      "changes the digest when a rendered category name changes",
+      async () => {
+        const before = project();
+        const after = project();
+
+        after.template.categories = [
+          {
+            id: "agreement",
+            name: "Agreement updated",
+            requirement: "optional",
+            description: "",
+            acceptedTypes: [],
+          },
+          {
+            id: "condition",
+            name: "Condition",
+            requirement: "optional",
+            description: "",
+            acceptedTypes: [],
+          },
+        ];
+
+        before.template.categories = [
+          {
+            id: "agreement",
+            name: "Agreement",
+            requirement: "optional",
+            description: "",
+            acceptedTypes: [],
+          },
+          {
+            id: "condition",
+            name: "Condition",
+            requirement: "optional",
+            description: "",
+            acceptedTypes: [],
+          },
+        ];
+
+        expect(
+          await computePackSnapshotDigest(
+            createPackSnapshot(before, 1),
+          ),
+        ).not.toBe(
+          await computePackSnapshotDigest(
+            createPackSnapshot(after, 1),
+          ),
+        );
+      },
+    );
+
+    it(
+      "rejects duplicate evidence IDs",
+      () => {
+        const duplicate =
+          project();
+
+        duplicate.evidence[1]!.id =
+          duplicate.evidence[0]!.id;
+
+        expect(
+          () =>
+            createPackSnapshot(
+              duplicate,
+              1,
+            ),
+        ).toThrow(
+          "Duplicate evidence id:",
         );
       },
     );
