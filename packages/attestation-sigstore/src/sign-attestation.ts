@@ -1,6 +1,7 @@
 import {
   attestationStatementBytes,
   computeAttestationStatementHash,
+  parseAttestationStatement,
 } from "@tracepack/attestation";
 
 import type {
@@ -20,14 +21,19 @@ export async function signAttestationWithSigstore(
   statement: AttestationStatementV1,
   options: SigstoreSigningOptions = {},
 ): Promise<SignedAttestationV1> {
+  const statementSnapshot =
+    parseAttestationStatement(
+      statement,
+    );
+
   const payload =
     attestationStatementBytes(
-      statement,
+      statementSnapshot,
     );
 
   const contentDigest =
     await computeAttestationStatementHash(
-      statement,
+      statementSnapshot,
     );
 
   const signed =
@@ -37,7 +43,8 @@ export async function signAttestationWithSigstore(
     );
 
   return {
-    statement,
+    statement:
+      statementSnapshot,
     signature: {
       method: "sigstore",
       content_digest: {

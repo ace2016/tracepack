@@ -10,6 +10,7 @@ import {
 
 import {
   SigstoreVerificationError,
+  signAttestationWithSigstore,
   verifyAttestationWithSigstore,
   verifyWithSigstore,
 } from "../src";
@@ -164,6 +165,71 @@ describe(
             "Sigstore bundle media type mismatch",
           );
         }
+      },
+    );
+
+
+    it(
+      "returns a detached snapshot of the statement being signed",
+      async () => {
+        const statement = {
+          schema_version:
+            "tracepack-attestation/v1" as const,
+          attestation_id:
+            "snapshot-test",
+          subject: {
+            kind:
+              "tracepack-pack" as const,
+            digest: {
+              algorithm:
+                "sha256" as const,
+              value:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            pack_version: 1,
+          },
+          statement: {
+            type:
+              "pack.approval",
+            text:
+              "Original text",
+          },
+          signer: {
+            party_id:
+              "snapshot-signer",
+          },
+          issued_at:
+            "2026-08-26T00:00:00Z",
+        };
+
+        const signing =
+          signAttestationWithSigstore(
+            statement,
+          );
+
+        statement.statement.text =
+          "Changed by caller";
+
+        let signed:
+          Awaited<
+            ReturnType<
+              typeof signAttestationWithSigstore
+            >
+          >;
+
+        try {
+          signed = await signing;
+        } catch {
+          return;
+        }
+
+        expect(
+          signed.statement,
+        ).not.toBe(statement);
+
+        expect(
+          signed.statement.statement.text,
+        ).toBe("Original text");
       },
     );
 

@@ -323,6 +323,55 @@ describe(
         expect(
           organisationId.maxLength,
         ).toBe(512);
+
+        const signer =
+          schema
+            .properties
+            .statement
+            .properties
+            .signer
+            .properties;
+
+        expect(
+          signer
+            .organisation
+            .properties
+            .name
+            .minLength,
+        ).toBe(1);
+
+        expect(
+          signer
+            .organisation
+            .properties
+            .name
+            .maxLength,
+        ).toBe(512);
+
+        expect(
+          signer
+            .expected_identity
+            .properties
+            .issuer
+            .maxLength,
+        ).toBe(2048);
+
+        expect(
+          signer
+            .expected_identity
+            .properties
+            .subject
+            .maxLength,
+        ).toBe(4096);
+
+        expect(
+          schema
+            .properties
+            .signature
+            .properties
+            .bundle_media_type
+            .maxLength,
+        ).toBe(512);
       },
     );
   },
@@ -502,6 +551,104 @@ describe(
               )
               ?.status,
           ).toBe("failed");
+        }
+      },
+    );
+  },
+);
+
+
+describe(
+  "identity mismatch reporting",
+  () => {
+    it(
+      "marks identity failed when verified identity does not match the declared identity",
+      async () => {
+        const {
+          createVerificationReport,
+          setVerificationStage,
+        } = await import("../src");
+
+        const value =
+          statement(
+            "party-a",
+            "organisation-signatory",
+            "organisation.signoff",
+          );
+
+        const envelope =
+          await signed(value);
+
+        const report =
+          createVerificationReport();
+
+        for (const stage of [
+          "structure",
+          "canonicalization",
+          "content_digest",
+          "bundle",
+          "trusted_root",
+          "certificate",
+          "transparency_log",
+          "signature",
+          "identity",
+          "policy",
+        ] as const) {
+          setVerificationStage(
+            report,
+            stage,
+            "passed",
+          );
+        }
+
+        const result =
+          await verifySignedAttestation(
+            envelope,
+            async () => ({
+              identity: {
+                issuer:
+                  "https://token.actions.githubusercontent.com",
+                subject:
+                  "https://example.test/different-party",
+              },
+              report,
+            }),
+          );
+
+        expect(result.valid).toBe(
+          false,
+        );
+
+        if (!result.valid) {
+          expect(
+            result.reason,
+          ).toBe(
+            "identity_mismatch",
+          );
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "identity",
+              )
+              ?.status,
+          ).toBe("failed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "identity",
+              )
+              ?.code,
+          ).toBe(
+            "ATTESTATION_IDENTITY_MISMATCH",
+          );
         }
       },
     );

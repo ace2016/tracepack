@@ -199,6 +199,26 @@ export async function verifySignedAttestation(
       expected.subject !==
         verifiedIdentity.subject)
   ) {
+    if (
+      report &&
+      report.stages.some(
+        (stage) =>
+          stage.id === "identity",
+      )
+    ) {
+      setVerificationStage(
+        report,
+        "identity",
+        "failed",
+        {
+          code:
+            "ATTESTATION_IDENTITY_MISMATCH",
+          message:
+            "Verified signer identity does not match the identity declared by the attestation.",
+        },
+      );
+    }
+
     return {
       valid: false,
       reason: "identity_mismatch",
