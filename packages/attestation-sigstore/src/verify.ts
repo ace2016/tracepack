@@ -58,8 +58,9 @@ function markSkippedAfterBundleFailure(
   }
 }
 
-function markCryptographicSuccess(
+export function markCryptographicSuccess(
   report: AttestationVerificationReportV1,
+  bundle: SerializedBundle,
 ): void {
   for (const stage of [
     "trusted_root",
@@ -74,13 +75,37 @@ function markCryptographicSuccess(
     );
   }
 
+  if (
+    hasRfc3161Timestamps(
+      bundle,
+    )
+  ) {
+    setVerificationStage(
+      report,
+      "timestamp",
+      "passed",
+      {
+        message:
+          "RFC 3161 trusted timestamp verified by Sigstore.",
+      },
+    );
+
+    report.evidence = {
+      ...report.evidence,
+      trusted_timestamp_verified:
+        true,
+    };
+
+    return;
+  }
+
   setVerificationStage(
     report,
     "timestamp",
     "skipped",
     {
       message:
-        "No independent TracePack timestamp assertion was made.",
+        "No independent RFC 3161 timestamp was present.",
     },
   );
 }
@@ -504,6 +529,7 @@ export async function verifyWithSigstore(
 
   markCryptographicSuccess(
     report,
+    parsedBundle,
   );
 
   let identity:

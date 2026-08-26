@@ -6,6 +6,7 @@ import {
 
 import {
   classifySigstoreFailure,
+  markCryptographicSuccess,
 } from "../src/verify";
 
 import {
@@ -148,6 +149,126 @@ describe(
           code:
             "SIGSTORE_TIMESTAMP_FAILED",
         });
+      },
+    );
+  },
+);
+
+describe(
+  "Sigstore successful timestamp reporting",
+  () => {
+    it(
+      "marks verified RFC3161 timestamp material as passed",
+      async () => {
+        const {
+          createVerificationReport,
+        } = await import(
+          "@tracepack/attestation"
+        );
+
+        const report =
+          createVerificationReport();
+
+        const bundle = {
+          mediaType:
+            "application/vnd.dev.sigstore.bundle.v0.3+json",
+
+          verificationMaterial: {
+            timestampVerificationData: {
+              rfc3161Timestamps: [
+                {
+                  signedTimestamp:
+                    "placeholder",
+                },
+              ],
+            },
+          },
+
+          messageSignature: {
+            messageDigest: {
+              algorithm:
+                "SHA2_256",
+              digest: "",
+            },
+            signature: "",
+          },
+        } as unknown as import(
+          "@sigstore/bundle"
+        ).SerializedBundle;
+
+        markCryptographicSuccess(
+          report,
+          bundle,
+        );
+
+        expect(
+          report.stages.find(
+            (stage) =>
+              stage.id ===
+              "timestamp",
+          ),
+        ).toMatchObject({
+          status: "passed",
+        });
+
+        expect(
+          report.evidence
+            ?.trusted_timestamp_verified,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "skips the independent timestamp stage when RFC3161 material is absent",
+      async () => {
+        const {
+          createVerificationReport,
+        } = await import(
+          "@tracepack/attestation"
+        );
+
+        const report =
+          createVerificationReport();
+
+        const bundle = {
+          mediaType:
+            "application/vnd.dev.sigstore.bundle+json;version=0.2",
+
+          verificationMaterial: {
+            tlogEntries: [],
+          },
+
+          messageSignature: {
+            messageDigest: {
+              algorithm:
+                "SHA2_256",
+              digest: "",
+            },
+            signature: "",
+          },
+        } as unknown as import(
+          "@sigstore/bundle"
+        ).SerializedBundle;
+
+        markCryptographicSuccess(
+          report,
+          bundle,
+        );
+
+        expect(
+          report.stages.find(
+            (stage) =>
+              stage.id ===
+              "timestamp",
+          ),
+        ).toMatchObject({
+          status: "skipped",
+        });
+
+        expect(
+          report.evidence
+            ?.trusted_timestamp_verified,
+        ).toBeUndefined();
       },
     );
   },
@@ -403,6 +524,64 @@ describe(
           ).toContain(
             "Sigstore bundle media type mismatch",
           );
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "structure",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "canonicalization",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "content_digest",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "bundle",
+              ),
+          ).toMatchObject({
+            status: "failed",
+            code:
+              "SIGSTORE_BUNDLE_MEDIA_TYPE_MISMATCH",
+          });
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "signature",
+              )
+              ?.status,
+          ).toBe("skipped");
         }
       },
     );

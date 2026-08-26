@@ -38,21 +38,30 @@ jobs:
       - name: Generate real TracePack attestation fixture
         if: >
           github.event_name == 'workflow_dispatch' ||
-          github.event.pull_request.head.repo.full_name == github.repository
+          (
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'
+          )
         working-directory: packages/attestation-sigstore
         run: pnpm exec tsx scripts/generate-attestation-fixture.ts
 
       - name: Verify TracePack attestation fixture
         if: >
           github.event_name == 'workflow_dispatch' ||
-          github.event.pull_request.head.repo.full_name == github.repository
+          (
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'
+          )
         working-directory: packages/attestation-sigstore
         run: pnpm exec tsx scripts/verify-attestation-fixture.ts
 
       - name: Upload fixture
         if: >
           github.event_name == 'workflow_dispatch' ||
-          github.event.pull_request.head.repo.full_name == github.repository
+          (
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            github.actor != 'dependabot[bot]'
+          )
         uses: actions/upload-artifact@v4
         with:
           name: tracepack-attestation-sigstore-fixture

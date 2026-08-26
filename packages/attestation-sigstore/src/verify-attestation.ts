@@ -1,4 +1,6 @@
 import {
+  createVerificationReport,
+  setVerificationStage,
   verifySignedAttestation,
 } from "@tracepack/attestation";
 
@@ -7,6 +9,7 @@ import type {
 } from "@tracepack/attestation";
 
 import {
+  SigstoreVerificationError,
   verifyWithSigstore,
 } from "./verify";
 
@@ -34,8 +37,46 @@ export async function verifyAttestationWithSigstore(
         embeddedMediaType !==
         bundleMediaType
       ) {
-        throw new Error(
-          `Sigstore bundle media type mismatch: envelope declares "${bundleMediaType}" but bundle declares "${embeddedMediaType ?? "missing"}".`,
+        const message =
+          `Sigstore bundle media type mismatch: envelope declares "${bundleMediaType}" but bundle declares "${embeddedMediaType ?? "missing"}".`;
+
+        const report =
+          createVerificationReport();
+
+        setVerificationStage(
+          report,
+          "bundle",
+          "failed",
+          {
+            code:
+              "SIGSTORE_BUNDLE_MEDIA_TYPE_MISMATCH",
+            message,
+          },
+        );
+
+        for (const stage of [
+          "trusted_root",
+          "certificate",
+          "transparency_log",
+          "timestamp",
+          "signature",
+          "identity",
+          "policy",
+        ] as const) {
+          setVerificationStage(
+            report,
+            stage,
+            "skipped",
+            {
+              message:
+                "Skipped because bundle media type validation failed.",
+            },
+          );
+        }
+
+        throw new SigstoreVerificationError(
+          message,
+          report,
         );
       }
 
