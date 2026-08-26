@@ -3,6 +3,7 @@ import {
   computeAttestationStatementHash,
 } from "./canonicalize";
 import type {
+  AttestationVerificationReportV1,
   AttestationVerificationResultV1,
   JsonObject,
   SignedAttestationV1,
@@ -12,13 +13,54 @@ import {
   safeParseSignedAttestation,
 } from "./validate";
 
+export interface SigstoreBundleVerificationSuccess {
+  identity: VerifiedSigstoreIdentityV1;
+  report?: AttestationVerificationReportV1;
+}
+
 export type SigstoreBundleVerifier = (
   input: {
     payload: Uint8Array;
     bundle: JsonObject;
     bundleMediaType: string;
   },
-) => Promise<VerifiedSigstoreIdentityV1>;
+) => Promise<
+  | VerifiedSigstoreIdentityV1
+  | SigstoreBundleVerificationSuccess
+>;
+
+function reportFromError(
+  error: unknown,
+): AttestationVerificationReportV1 | undefined {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("report" in error)
+  ) {
+    return undefined;
+  }
+
+  const report =
+    (error as {
+      report?: unknown;
+    }).report;
+
+  if (
+    typeof report !== "object" ||
+    report === null ||
+    !("stages" in report) ||
+    !Array.isArray(
+      (report as {
+        stages?: unknown;
+      }).stages,
+    )
+  ) {
+    return undefined;
+  }
+
+  return report as
+    AttestationVerificationReportV1;
+}
 
 export async function verifySignedAttestation(
   input: unknown,
@@ -58,8 +100,12 @@ export async function verifySignedAttestation(
   let verifiedIdentity:
     VerifiedSigstoreIdentityV1;
 
+  let report:
+    AttestationVerificationReportV1
+    | undefined;
+
   try {
-    verifiedIdentity =
+    const verification =
       await verifySigstoreBundle({
         payload:
           attestationStatementBytes(
@@ -71,7 +117,21 @@ export async function verifySignedAttestation(
           attestation.signature
             .bundle_media_type,
       });
+
+    if ("identity" in verification) {
+      verifiedIdentity =
+        verification.identity;
+
+      report =
+        verification.report;
+    } else {
+      verifiedIdentity =
+        verification;
+    }
   } catch (error) {
+    const failureReport =
+      reportFromError(error);
+
     return {
       valid: false,
       reason:
@@ -81,6 +141,12 @@ export async function verifySignedAttestation(
           ? error.message
           : "Sigstore verification failed",
       ],
+      ...(failureReport
+        ? {
+            report:
+              failureReport,
+          }
+        : {}),
     };
   }
 
@@ -98,6 +164,11 @@ export async function verifySignedAttestation(
     return {
       valid: false,
       reason: "identity_mismatch",
+      ...(report
+        ? {
+            report,
+          }
+        : {}),
     };
   }
 
@@ -109,5 +180,10 @@ export async function verifySignedAttestation(
     identity_binding: expected
       ? "matched"
       : "not_declared",
+    ...(report
+      ? {
+          report,
+        }
+      : {}),
   };
 }

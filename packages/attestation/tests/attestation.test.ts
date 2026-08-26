@@ -468,3 +468,108 @@ describe(
     );
   },
 );
+
+
+describe(
+  "verification report propagation",
+  () => {
+    it(
+      "preserves a verifier report on success",
+      async () => {
+        const value =
+          statement(
+            "party-report",
+            "reviewer",
+            "review.approval",
+          );
+
+        const envelope =
+          await signed(value);
+
+        const report = {
+          stages: [
+            {
+              id:
+                "signature" as const,
+              status:
+                "passed" as const,
+            },
+          ],
+        };
+
+        const result =
+          await verifySignedAttestation(
+            envelope,
+            async () => ({
+              identity: {
+                issuer:
+                  "https://token.actions.githubusercontent.com",
+                subject:
+                  "https://example.test/party-report",
+              },
+              report,
+            }),
+          );
+
+        expect(
+          result.report,
+        ).toEqual(report);
+      },
+    );
+
+    it(
+      "preserves a verifier report on failure",
+      async () => {
+        const value =
+          statement(
+            "party-report-failure",
+            "reviewer",
+            "review.approval",
+          );
+
+        const envelope =
+          await signed(value);
+
+        const report = {
+          stages: [
+            {
+              id:
+                "signature" as const,
+              status:
+                "failed" as const,
+              code:
+                "TEST_SIGNATURE_FAILURE",
+            },
+          ],
+        };
+
+        const result =
+          await verifySignedAttestation(
+            envelope,
+            async () => {
+              const error =
+                new Error(
+                  "Signature failed",
+                ) as Error & {
+                  report:
+                    typeof report;
+                };
+
+              error.report =
+                report;
+
+              throw error;
+            },
+          );
+
+        expect(
+          result.valid,
+        ).toBe(false);
+
+        expect(
+          result.report,
+        ).toEqual(report);
+      },
+    );
+  },
+);

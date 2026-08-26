@@ -32,89 +32,85 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate real Sigstore fixture
+      - name: Typecheck attestation Sigstore package
+        run: pnpm --filter @tracepack/attestation-sigstore typecheck
+
+      - name: Generate real TracePack attestation fixture
+        working-directory: packages/attestation-sigstore
+        run: node scripts/generate-attestation-fixture.ts
+
+      - name: Verify TracePack attestation fixture
         working-directory: packages/attestation-sigstore
         run: |
-          mkdir -p fixture-output
-
-          cat > fixture-output/payload.txt <<'PAYLOAD'
-          tracepack-attestation-sigstore-fixture-v1
-          PAYLOAD
-
           node --input-type=module <<'NODE'
           import fs from "node:fs";
-          import { sign } from "sigstore";
+          import {
+            verifyAttestationWithSigstore,
+          } from "./src/verify-attestation.ts";
 
-          const payloadPath =
-            "fixture-output/payload.txt";
+          const attestation =
+            JSON.parse(
+              fs.readFileSync(
+                "fixture-output/attestation.sigstore.json",
+                "utf8",
+              ),
+            );
 
-          const bundlePath =
-            "fixture-output/payload.sigstore.json";
+          const result =
+            await verifyAttestationWithSigstore(
+              attestation,
+              {
+                certificateIssuer:
+                  attestation.statement
+                    .signer
+                    .expected_identity
+                    .issuer,
 
-          const payload =
-            fs.readFileSync(payloadPath);
+                certificateIdentityURI:
+                  attestation.statement
+                    .signer
+                    .expected_identity
+                    .subject,
+              },
+            );
 
-          const bundle =
-            await sign(payload, {
-              tlogUpload: true,
-            });
+          if (!result.valid) {
+            throw new Error(
+              "TracePack attestation verification failed.",
+            );
+          }
 
-          fs.writeFileSync(
-            bundlePath,
-            JSON.stringify(
-              bundle,
-              null,
-              2,
-            ),
+          console.log(
+            "TRACEPACK_ATTESTATION_VERIFIED",
           );
 
           console.log(
             JSON.stringify(
               {
-                mediaType:
-                  bundle.mediaType,
-                keys:
-                  Object.keys(bundle),
+                issuer:
+                  result.verified_identity
+                    .issuer,
+
+                subject:
+                  result.verified_identity
+                    .subject,
+
+                identityBinding:
+                  result.identity_binding,
+
+                statementType:
+                  result.attestation
+                    .statement
+                    .statement
+                    .type,
+
+                subjectDigest:
+                  result.attestation
+                    .statement
+                    .subject
+                    .digest
+                    .value,
               },
-              null,
-              2,
-            ),
-          );
-          NODE
-
-      - name: Verify fixture and inspect identity
-        working-directory: packages/attestation-sigstore
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from "node:fs";
-          import { verify } from "sigstore";
-
-          const payload =
-            fs.readFileSync(
-              "fixture-output/payload.txt",
-            );
-
-          const bundle =
-            JSON.parse(
-              fs.readFileSync(
-                "fixture-output/payload.sigstore.json",
-                "utf8",
-              ),
-            );
-
-          const signer =
-            await verify(
-              bundle,
-              payload,
-            );
-
-          console.log(
-            "VERIFIED_SIGSTORE_IDENTITY",
-          );
-
-          console.log(
-            JSON.stringify(
-              signer.identity,
               null,
               2,
             ),
@@ -126,7 +122,8 @@ jobs:
         with:
           name: tracepack-attestation-sigstore-fixture
           path: |
-            packages/attestation-sigstore/fixture-output/payload.txt
-            packages/attestation-sigstore/fixture-output/payload.sigstore.json
+            packages/attestation-sigstore/fixture-output/attestation-statement.json
+            packages/attestation-sigstore/fixture-output/attestation-payload.bin
+            packages/attestation-sigstore/fixture-output/attestation.sigstore.json
           if-no-files-found: error
           retention-days: 7
