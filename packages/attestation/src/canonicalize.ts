@@ -141,6 +141,8 @@ function assertCanonicalJsonValue(
     for (
       const key of Object.keys(value)
     ) {
+      assertValidUnicodeString(key);
+
       assertCanonicalJsonValue(
         (
           value as Record<

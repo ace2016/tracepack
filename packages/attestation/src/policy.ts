@@ -61,6 +61,24 @@ export function evaluateAttestationPolicy(
           };
         }
 
+        if (
+          requirement
+            .require_identity_binding !==
+              undefined &&
+          typeof requirement
+            .require_identity_binding !==
+              "boolean"
+        ) {
+          return {
+            requirement_id:
+              requirement.id,
+            satisfied: false,
+            required:
+              requirement.minimum_signers,
+            matched_parties: [],
+          };
+        }
+
         const parties = new Map<
           string,
           string

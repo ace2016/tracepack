@@ -439,6 +439,20 @@ describe(
           "Value cannot be represented as canonical JSON.",
         );
 
+        const invalidKey = {
+          ["\ud800"]:
+            "invalid",
+        };
+
+        expect(
+          () =>
+            canonicalizeJson(
+              invalidKey,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
         expect(
           canonicalizeJson({
             value: "\ud83d\ude00",
@@ -1053,6 +1067,83 @@ describe(
                     "organisation.signoff",
                   role: "",
                   minimum_signers: 1,
+                },
+              ],
+            },
+            verified,
+          );
+
+        expect(
+          result.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.satisfied,
+        ).toBe(false);
+
+        expect(
+          result.requirements[0]
+            ?.matched_parties,
+        ).toEqual([]);
+      },
+    );
+  },
+);
+
+describe(
+  "invalid identity binding constraint handling",
+  () => {
+    it(
+      "fails closed for a non-boolean identity binding constraint",
+      async () => {
+        const value =
+          statement(
+            "party-a",
+            "organisation-signatory",
+            "organisation.signoff",
+          );
+
+        const envelope =
+          await signed(value);
+
+        const verified:
+          AttestationVerificationResultV1[] =
+          [
+            {
+              valid: true,
+              attestation:
+                envelope,
+              verified_identity: {
+                issuer:
+                  "issuer",
+                subject:
+                  "party-a",
+              },
+              identity_binding:
+                "not_declared",
+            },
+          ];
+
+        const result =
+          evaluateAttestationPolicy(
+            {
+              policy_version:
+                "tracepack-attestation-policy/v1",
+
+              subject:
+                value.subject,
+
+              requirements: [
+                {
+                  id:
+                    "invalid-binding-type",
+                  statement_type:
+                    "organisation.signoff",
+                  minimum_signers: 1,
+
+                  require_identity_binding:
+                    "true" as unknown as boolean,
                 },
               ],
             },
