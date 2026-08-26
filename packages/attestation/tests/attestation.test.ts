@@ -5,6 +5,7 @@ import {
 } from "vitest";
 
 import {
+  canonicalizeJson,
   computeAttestationStatementHash,
   evaluateAttestationPolicy,
   parseSignedAttestation,
@@ -141,11 +142,61 @@ describe(
             }),
           );
 
-        expect(result).toEqual({
-          valid: false,
-          reason:
+        expect(result.valid).toBe(
+          false,
+        );
+
+        if (!result.valid) {
+          expect(result.reason).toBe(
             "content_digest_mismatch",
-        });
+          );
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "structure",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "canonicalization",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "content_digest",
+              )
+              ?.status,
+          ).toBe("failed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "content_digest",
+              )
+              ?.code,
+          ).toBe(
+            "ATTESTATION_CONTENT_DIGEST_MISMATCH",
+          );
+        }
       },
     );
 
@@ -283,6 +334,101 @@ describe(
   },
 );
 
+
+
+describe(
+  "canonical JSON input validation",
+  () => {
+    it(
+      "rejects values that cannot be represented as canonical JSON",
+      () => {
+        expect(
+          () =>
+            canonicalizeJson(
+              undefined,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+
+        expect(
+          () =>
+            canonicalizeJson(
+              () => undefined,
+            ),
+        ).toThrow(
+          "Value cannot be represented as canonical JSON.",
+        );
+      },
+    );
+  },
+);
+
+describe(
+  "pre-Sigstore validation failures",
+  () => {
+    it(
+      "reports malformed envelope structure failures",
+      async () => {
+        const result =
+          await verifySignedAttestation(
+            {
+              not:
+                "an attestation",
+            },
+            async () => {
+              throw new Error(
+                "Sigstore verifier must not run.",
+              );
+            },
+          );
+
+        expect(result.valid).toBe(
+          false,
+        );
+
+        if (!result.valid) {
+          expect(result.reason).toBe(
+            "invalid_structure",
+          );
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "structure",
+              )
+              ?.status,
+          ).toBe("failed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "canonicalization",
+              )
+              ?.status,
+          ).toBe("skipped");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "bundle",
+              )
+              ?.status,
+          ).toBe("skipped");
+        }
+      },
+    );
+  },
+);
 
 describe(
   "attestation JSON schema parity",

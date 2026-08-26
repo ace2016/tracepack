@@ -6,7 +6,16 @@ import type {
 export function canonicalizeJson(
   value: unknown,
 ): string {
-  return canonicalize(value) ?? "null";
+  const result =
+    canonicalize(value);
+
+  if (result === undefined) {
+    throw new TypeError(
+      "Value cannot be represented as canonical JSON.",
+    );
+  }
+
+  return result;
 }
 
 export function attestationStatementBytes(
