@@ -5,7 +5,12 @@ import {
 } from "vitest";
 
 import {
+  computeAttestationStatementHash,
+} from "@tracepack/attestation";
+
+import {
   SigstoreVerificationError,
+  verifyAttestationWithSigstore,
   verifyWithSigstore,
 } from "../src";
 
@@ -70,5 +75,97 @@ describe(
         }
       },
     );
+
+    it(
+      "rejects contradictory envelope and embedded bundle media types",
+      async () => {
+        const statement = {
+          schema_version:
+            "tracepack-attestation/v1" as const,
+
+          attestation_id:
+            "media-type-mismatch",
+
+          subject: {
+            kind:
+              "tracepack-pack" as const,
+
+            digest: {
+              algorithm:
+                "sha256" as const,
+
+              value:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+
+            pack_version: 1,
+          },
+
+          statement: {
+            type:
+              "pack.approval",
+
+            text:
+              "Media type mismatch regression",
+          },
+
+          signer: {
+            party_id:
+              "fixture-signer",
+          },
+
+          issued_at:
+            "2026-08-26T00:00:00Z",
+        };
+
+        const digest =
+          await computeAttestationStatementHash(
+            statement,
+          );
+
+        const result =
+          await verifyAttestationWithSigstore(
+            {
+              statement,
+
+              signature: {
+                method:
+                  "sigstore",
+
+                content_digest: {
+                  algorithm:
+                    "sha256",
+
+                  value:
+                    digest,
+                },
+
+                bundle_media_type:
+                  "application/vnd.dev.sigstore.bundle+json;version=0.3",
+
+                bundle: {
+                  mediaType:
+                    "application/vnd.dev.sigstore.bundle+json;version=0.2",
+
+                  verificationMaterial: {},
+                },
+              },
+            },
+          );
+
+        expect(result.valid).toBe(
+          false,
+        );
+
+        if (!result.valid) {
+          expect(
+            result.errors?.[0],
+          ).toContain(
+            "Sigstore bundle media type mismatch",
+          );
+        }
+      },
+    );
+
   },
 );

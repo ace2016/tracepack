@@ -283,6 +283,51 @@ describe(
   },
 );
 
+
+describe(
+  "attestation JSON schema parity",
+  () => {
+    it(
+      "mirrors organisation id runtime bounds",
+      async () => {
+        const {
+          readFileSync,
+        } = await import("node:fs");
+
+        const schema =
+          JSON.parse(
+            readFileSync(
+              new URL(
+                "../schema/tracepack-attestation.v1.json",
+                import.meta.url,
+              ),
+              "utf8",
+            ),
+          );
+
+        const organisationId =
+          schema
+            .properties
+            .statement
+            .properties
+            .signer
+            .properties
+            .organisation
+            .properties
+            .id;
+
+        expect(
+          organisationId.minLength,
+        ).toBe(1);
+
+        expect(
+          organisationId.maxLength,
+        ).toBe(512);
+      },
+    );
+  },
+);
+
 describe(
   "verification stage reporting",
   () => {
@@ -351,6 +396,113 @@ describe(
           message:
             "Signing certificate is not trusted.",
         });
+      },
+    );
+  },
+);
+
+
+describe(
+  "pre-Sigstore report propagation",
+  () => {
+    it(
+      "marks completed structure canonicalization and content digest stages before a Sigstore failure",
+      async () => {
+        const {
+          createVerificationReport,
+          setVerificationStage,
+        } = await import("../src");
+
+        const value =
+          statement(
+            "party-a",
+            "organisation-signatory",
+            "organisation.signoff",
+          );
+
+        const envelope =
+          await signed(value);
+
+        const result =
+          await verifySignedAttestation(
+            envelope,
+            async () => {
+              const report =
+                createVerificationReport();
+
+              setVerificationStage(
+                report,
+                "bundle",
+                "failed",
+                {
+                  code:
+                    "SIGSTORE_BUNDLE_INVALID",
+                  message:
+                    "Fixture bundle rejected.",
+                },
+              );
+
+              const error =
+                Object.assign(
+                  new Error(
+                    "Fixture bundle rejected.",
+                  ),
+                  {
+                    report,
+                  },
+                );
+
+              throw error;
+            },
+          );
+
+        expect(result.valid).toBe(false);
+
+        if (!result.valid) {
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "structure",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "canonicalization",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "content_digest",
+              )
+              ?.status,
+          ).toBe("passed");
+
+          expect(
+            result.report
+              ?.stages
+              .find(
+                (stage) =>
+                  stage.id ===
+                  "bundle",
+              )
+              ?.status,
+          ).toBe("failed");
+        }
       },
     );
   },

@@ -103,7 +103,9 @@
               "additionalProperties": false,
               "properties": {
                 "id": {
-                  "type": "string"
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
                 },
                 "name": {
                   "type": "string"

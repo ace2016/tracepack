@@ -23,7 +23,22 @@ export async function verifyAttestationWithSigstore(
     async ({
       payload,
       bundle,
+      bundleMediaType,
     }) => {
+      const embeddedMediaType =
+        typeof bundle.mediaType === "string"
+          ? bundle.mediaType
+          : undefined;
+
+      if (
+        embeddedMediaType !==
+        bundleMediaType
+      ) {
+        throw new Error(
+          `Sigstore bundle media type mismatch: envelope declares "${bundleMediaType}" but bundle declares "${embeddedMediaType ?? "missing"}".`,
+        );
+      }
+
       const result =
         await verifyWithSigstore(
           payload,
@@ -31,7 +46,7 @@ export async function verifyAttestationWithSigstore(
           policy,
         );
 
-      return result.identity;
+      return result;
     },
   );
 }

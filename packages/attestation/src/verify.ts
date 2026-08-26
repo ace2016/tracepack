@@ -12,6 +12,32 @@ import type {
 import {
   safeParseSignedAttestation,
 } from "./validate";
+import {
+  setVerificationStage,
+} from "./report";
+
+function markPreSigstoreStagesPassed(
+  report: AttestationVerificationReportV1,
+): void {
+  for (const stage of [
+    "structure",
+    "canonicalization",
+    "content_digest",
+  ] as const) {
+    if (
+      report.stages.some(
+        (candidate) =>
+          candidate.id === stage,
+      )
+    ) {
+      setVerificationStage(
+        report,
+        stage,
+        "passed",
+      );
+    }
+  }
+}
 
 export interface SigstoreBundleVerificationSuccess {
   identity: VerifiedSigstoreIdentityV1;
@@ -124,6 +150,12 @@ export async function verifySignedAttestation(
 
       report =
         verification.report;
+
+      if (report) {
+        markPreSigstoreStagesPassed(
+          report,
+        );
+      }
     } else {
       verifiedIdentity =
         verification;
@@ -131,6 +163,12 @@ export async function verifySignedAttestation(
   } catch (error) {
     const failureReport =
       reportFromError(error);
+
+    if (failureReport) {
+      markPreSigstoreStagesPassed(
+        failureReport,
+      );
+    }
 
     return {
       valid: false,
