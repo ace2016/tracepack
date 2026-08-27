@@ -28,6 +28,7 @@ const nav: Group[] = [
   ]},
   { title: "Developer tools", items: [
     { id: "sdk", label: "SDK" },
+    { id: "attestation", label: "Pack attestations" },
     { id: "cli", label: "CLI" },
     { id: "evidence-format", label: "Evidence format" },
     { id: "handoff", label: "Browser handoff" },
@@ -57,6 +58,7 @@ const toc: Record<string, string[]> = {
   "freescout": ["Workflow", "Support desk pattern", "Preserve conversation context", "Review boundary"],
   "integration-security": ["Origin checks", "Replay protection", "Timeouts", "Producer identity", "Sensitive data", "Trust model"],
   "sdk": ["Install", "Build a payload", "Hash attachments", "Compute payload hash", "Validate", "JSON Schema", "Test vectors", "Versioning"],
+  "attestation": ["Three packages", "Create a pack subject", "What is bound", "What it proves", "What it does not prove", "Sigstore privacy boundary"],
   "cli": ["Install", "validate-template", "validate-evidence", "diff-manifest", "Exit codes", "CI usage"],
   "evidence-format": ["What v1 is", "Top-level fields", "Attachments", "Observations", "Integrity", "Validation beyond JSON Schema"],
   "handoff": ["Install", "Create handoff", "Start handoff", "Origin checks", "Lifecycle acknowledgements", "Timeouts", "Template intent"],
@@ -325,6 +327,22 @@ if (!result.ok) {
           <h2>Test vectors</h2><p>Language-agnostic conformance vectors cover attachment hashes, payload hashes and pass/fail validation cases. Reproduce them when implementing the contract outside TypeScript.</p>
           <h2>Versioning</h2><p><code>schema_version: 1</code> is frozen. The npm package can receive fixes independently without changing what the v1 wire contract means.</p>
           <a className="textLink" href="https://github.com/ace2016/tracepack/tree/main/packages/evidence-sdk">View SDK source and README ↗</a>
+        </Page>}
+
+        {active === "attestation" && <Page eyebrow="Developer tools" title="Pack attestations" lead="Bind independently verifiable statements and signing identities to one immutable TracePack pack digest.">
+          <h2>Three packages</h2><ul><li><code>@tracepack/attestation</code> defines the portable Attestation v1 statement, verification and policy model.</li><li><code>@tracepack/attestation-sigstore</code> signs and verifies attestations with Sigstore.</li><li><code>@tracepack/pack-attestation</code> creates deterministic pack snapshots and attestation subjects after verifying included evidence bytes.</li></ul>
+          <h2>Create a pack subject</h2><Code>{`import {
+  createPackSnapshot,
+  packSnapshotToAttestationSubject
+} from "@tracepack/pack-attestation";
+
+const snapshot = createPackSnapshot(project, packVersion);
+const subject = await packSnapshotToAttestationSubject(snapshot, evidenceFiles);`}</Code>
+          <h2>What is bound</h2><p>The pack subject binds the deterministic snapshot, pack version and included evidence content. Included evidence bytes are checked against their recorded SHA-256 hashes before the subject is finalized.</p>
+          <h2>What it proves</h2><p>A valid attestation can show that a verified signing identity signed a statement about that pack subject digest. Policy evaluation can require more than one independent attestation.</p>
+          <h2>What it does not prove</h2><Note title="Signing identity is not producer identity."><p>Attestation does not authenticate the self-asserted <code>producer_id</code> inside a <code>tracepack-evidence</code> v1 payload, prove that evidence is true, or establish who originally created the evidence.</p></Note>
+          <h2>Sigstore privacy boundary</h2><p>Evidence file contents are not submitted to Sigstore by the attestation signing flow. The canonical attestation statement is signed, and that statement contains its pack subject digest. Transparency-log upload is enabled by default, so do not place secrets or unnecessary personal data in attestation statements.</p>
+          <a className="textLink" href="https://github.com/ace2016/tracepack/tree/main/packages/attestation">Read the Attestation v1 specification ↗</a>
         </Page>}
 
         {active === "cli" && <Page eyebrow="Developer tools" title="CLI" lead="Run TracePack validation and manifest comparison outside the browser, including in CI.">

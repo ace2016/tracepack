@@ -35,20 +35,36 @@ packages/
   export-engine/          builds the PDF pack, the JSON manifest, and the .tracepack bundle.
   storage/                IndexedDB persistence (projects and evidence file blobs).
   template-engine/        loads template.yaml definitions that shape a project's categories.
-  evidence-interchange/   the tracepack-evidence v1 contract: schema, canonicalization,
-                           validation, and import from external producers.
+  evidence-sdk/           portable tracepack-evidence v1 types, schema validation and
+                           canonicalisation used by external producers.
+  evidence-interchange/   TracePack-internal import path for tracepack-evidence v1 payloads.
+  attestation/            portable Attestation v1 model, canonicalisation, verification and
+                           policy primitives.
+  attestation-sigstore/   Sigstore signing and verification runtime for attestations.
+  pack-attestation/       deterministic pack snapshots and pack-snapshot attestation subjects.
 templates/
-  consumer-complaint/     the one template that exists today.
+  consumer-complaint/     consumer complaint evidence template.
+  provenance-trace/       provenance-oriented evidence template.
+  general/                general-purpose evidence template.
+  woocommerce-order-evidence/
+                           WooCommerce order evidence template.
 examples/
   producers/consumer-rights-helper/   a worked, independent implementation of a
                                        tracepack-evidence v1 producer, built with zero
                                        imports from Tracepack's own code.
 ```
 
-Each package is a separate pnpm workspace member with its own `package.json`, `typecheck`, and
-`test` script. `apps/workspace` depends on `evidence-core`, `document-engine`, `export-engine`,
-`storage`, and `template-engine`. Nothing depends on `apps/workspace` or `apps/extension`.
-`evidence-interchange` depends only on `evidence-core`.
+Packages are separate pnpm workspace members with their own package metadata and validation
+commands. Product-facing packages remain independent of `apps/workspace` and `apps/extension`,
+while the portable developer packages are designed so their public contracts can be consumed
+without importing the browser workspace.
+
+`evidence-sdk` contains the portable `tracepack-evidence` contract implementation.
+`evidence-interchange` is the TracePack-internal importer and can depend on product-side document
+processing and storage. The attestation packages form another layered boundary:
+`attestation` contains portable contract and policy primitives, `attestation-sigstore` supplies
+the Sigstore runtime, and `pack-attestation` connects immutable TracePack pack snapshots to
+attestation subjects.
 
 ## Data model
 
@@ -110,10 +126,14 @@ reaches storage. The contract is **frozen as of v1**; see `SPEC.md` in that pack
 constraint exists, and `examples/producers/consumer-rights-helper` for what an independent,
 zero-import implementation of a producer actually looks like.
 
-Producer identity in this contract is self-asserted, not cryptographically verified. See
-`SECURITY.md` for what that means in practice and the (currently unimplemented, research-only)
-Sigstore-based direction being considered for real authenticated identity -- planned, if it
-ships, as a `tracepack-authentication` layer on top of this contract, not a breaking `v2` of it.
+Producer identity in this contract is self-asserted, not cryptographically verified. The
+separate Attestation v1 system does not change that rule. An attestation can cryptographically
+bind a Sigstore-authenticated signing identity to a statement about one immutable pack digest,
+but it does not authenticate the `source.producer_id` declared by an interchange payload and
+does not prove that the underlying evidence or observation is true.
+
+The separation is deliberate: `tracepack-evidence` remains a portable evidence interchange
+contract, while attestation is an independent trust layer over finalized pack state.
 
 ## Storage model
 
@@ -147,8 +167,10 @@ automated `e2e` script covers.
 This section exists so nothing here is assumed by accident:
 
 - No account, no sync, no server-side storage of any kind.
-- No multi-party or cryptographic signing of evidence. Producer identity is self-asserted; see
-  `SECURITY.md`.
+- No automatic authentication of `tracepack-evidence` producer identity. Producer identity in
+  the interchange contract remains self-asserted. TracePack does provide a separate cryptographic
+  Attestation v1 layer for signed statements about immutable pack digests; see `SECURITY.md` and
+  `packages/attestation/SPEC.md`.
 - No hosted or shared pack: the "Send to Tracepack" embed button (see
   `packages/evidence-interchange/EMBED_GUIDE.md`) hands evidence into the customer's own local
   pack only. A page both sides can see, email delivery, and a copy retained on the sending

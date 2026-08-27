@@ -6,13 +6,17 @@ ever seems to disagree with this table, this table wins; open an issue and it wi
 
 ## The split
 
-**Apache License 2.0** covers the portable format and SDK layer, the code meant to be freely
+**Apache License 2.0** covers the portable format and developer layer, the code meant to be freely
 implemented by anyone, including a competitor, with no obligation back to this project:
 
 - `packages/evidence-core`
 - `packages/evidence-sdk`
 - `packages/template-engine`
+- `packages/integration`
 - `packages/cli`
+- `packages/attestation`
+- `packages/attestation-sigstore`
+- `packages/pack-attestation`
 - `examples/`
 
 Each of those directories carries its own `LICENSE` file with the full Apache-2.0 text, and
@@ -76,7 +80,11 @@ licensing only works if the project actually holds the rights needed to relicens
 | `packages/evidence-core` | Apache-2.0 |
 | `packages/evidence-sdk` | Apache-2.0 |
 | `packages/template-engine` | Apache-2.0 |
+| `packages/integration` | Apache-2.0 |
 | `packages/cli` | Apache-2.0 |
+| `packages/attestation` | Apache-2.0 |
+| `packages/attestation-sigstore` | Apache-2.0 |
+| `packages/pack-attestation` | Apache-2.0 |
 | `examples/` | Apache-2.0 |
 | `apps/workspace` | AGPLv3 |
 | `apps/extension` | AGPLv3 |

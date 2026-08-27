@@ -44,10 +44,15 @@ and [docs.tracepack.org](https://docs.tracepack.org) cover the SDK/CLI and the r
 
 ## What Tracepack does not claim
 
-Producer identity in the interchange contract is **self-asserted, not cryptographically
-verified**; see `SPEC.md` §5 and §13 for exactly what a hash does and does not prove. Tracepack
-does not currently support any form of multi-party signing, authenticated identity, or hosted
-sync. See [`SECURITY.md`](SECURITY.md) for the full trust model.
+Producer identity in the `tracepack-evidence` interchange contract is **self-asserted, not
+cryptographically verified**. TracePack Attestation v1 is a separate trust layer: it can bind
+signed statements to an immutable pack digest and authenticate a Sigstore signing identity,
+including policies that require multiple independent attestations. It does not authenticate
+the producer identity declared inside a `tracepack-evidence` payload or prove that evidence is
+true.
+
+Tracepack does not currently provide hosted sync or shared cloud packs. See
+[`SECURITY.md`](SECURITY.md) for the full trust model.
 
 ## Repository layout
 
@@ -107,23 +112,30 @@ The integration suggests the [`woocommerce-order-evidence`](templates/woocommerc
 
 ## Developer packages
 
-The developer-v0.2.0 release publishes the TracePack developer package set to npm:
+TracePack publishes eight public developer packages through the verified developer release workflow:
 
 ```sh
 npm install @tracepack/evidence-core
 npm install @tracepack/evidence-sdk
 npm install @tracepack/template-engine
 npm install @tracepack/integration
+npm install @tracepack/attestation
+npm install @tracepack/attestation-sigstore
+npm install @tracepack/pack-attestation
 npm install -g @tracepack/cli
 ```
 
 - `@tracepack/evidence-core` provides the portable evidence domain model.
-- `@tracepack/evidence-sdk` provides the tracepack-evidence v1 types, validation, canonicalisation and hashing helpers.
+- `@tracepack/evidence-sdk` provides the `tracepack-evidence` v1 types, validation, canonicalisation and hashing helpers.
 - `@tracepack/template-engine` loads and validates TracePack templates.
 - `@tracepack/integration` provides browser and TypeScript helpers for deliberate Send to TracePack handoffs.
+- `@tracepack/attestation` provides the portable Attestation v1 contract and policy primitives.
+- `@tracepack/attestation-sigstore` provides Sigstore signing and verification for TracePack attestations.
+- `@tracepack/pack-attestation` binds deterministic pack snapshots and verified evidence bytes to attestation subjects.
 - `@tracepack/cli` validates templates and evidence payloads and compares exported manifests.
 
-The packages are released together with npm provenance through the verified TracePack developer release workflow.
+See [`docs/PUBLISHING_PACKAGES.md`](docs/PUBLISHING_PACKAGES.md) and
+[`docs/VERIFYING_RELEASES.md`](docs/VERIFYING_RELEASES.md).
 
 ## Development
 
@@ -175,8 +187,9 @@ Spendmita Ltd is or what the company processes.
 ## Licence
 
 Two licenses, split by what each part of the repository is for. The `tracepack-evidence`
-format and SDK layer (`packages/evidence-core`, `evidence-sdk`, `template-engine`, `cli`, and
-`examples/`) are Apache License 2.0, free for anyone to build on with no restriction. The
+format and developer layer (`packages/evidence-core`, `evidence-sdk`, `template-engine`,
+`integration`, `cli`, `attestation`, `attestation-sigstore`, `pack-attestation`, and `examples/`)
+are Apache License 2.0, free for anyone to build on with no restriction. The
 product itself (`apps/`, `templates/`, and the remaining `packages/`) is GNU Affero General
 Public License v3.0, free to self host and modify, with the condition that a modified,
 network hosted version has to share its source. A commercial license is available for anyone

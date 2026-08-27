@@ -33,10 +33,10 @@ Then verify the Sigstore bundle. Replace the tag and archive name with the relea
 
 ```sh
 cosign verify-blob \
-  --bundle tracepack-evidence-sdk-0.1.0.tgz.sigstore.json \
-  --certificate-identity "https://github.com/ace2016/tracepack/.github/workflows/publish.yml@refs/tags/developer-v0.1.0" \
+  --bundle tracepack-evidence-sdk-0.2.1.tgz.sigstore.json \
+  --certificate-identity "https://github.com/ace2016/tracepack/.github/workflows/publish.yml@refs/tags/developer-v0.2.1" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  tracepack-evidence-sdk-0.1.0.tgz
+  tracepack-evidence-sdk-0.2.1.tgz
 ```
 
 Verification must pin the complete repository, workflow and tag identity. A partial repository

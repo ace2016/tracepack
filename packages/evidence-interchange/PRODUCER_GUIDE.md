@@ -133,8 +133,9 @@ style is recommended for `producer_id` but not enforced.
 payload in v1.** Nothing stops another producer from claiming your `producer_id`. Design your
 integration accordingly — don't build anything that assumes Tracepack has authenticated you.
 Tracepack's own UI and exports are written to never imply otherwise (look for "self-asserted"
-and "not cryptographically verified" language in exported manifests). A future schema version
-may add real signature-based authentication; v1 deliberately does not have it.
+and "not cryptographically verified" language in exported manifests). TracePack Attestation v1
+is a separate trust layer and does not authenticate this producer identity; interchange v1
+deliberately does not provide producer authentication.
 
 ## 5. Observations — what you're allowed to claim
 
