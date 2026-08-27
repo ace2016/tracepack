@@ -5,7 +5,7 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@tracepack/evidence-core": "workspace:*", "pdfjs-dist": "5.4.624" },
+  "dependencies": { "@tracepack/evidence-core": "workspace:*", "pdfjs-dist": "6.2.108" },
   "scripts": { "build": "tsc --noEmit", "typecheck": "tsc --noEmit", "test": "vitest run --passWithNoTests" },
   "devDependencies": { "typescript": "^5.9.2", "vitest": "^3.2.4" }
 }
