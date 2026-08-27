@@ -11,7 +11,7 @@ Tracepack publishes eight public developer packages:
 7. `@tracepack/attestation-sigstore`
 8. `@tracepack/pack-attestation`
 
-`@tracepack/evidence-interchange` is deliberately not a fifth public package. It is the
+`@tracepack/evidence-interchange` is deliberately not a public package. It is the
 Tracepack workspace's internal importer and depends on browser storage and document processing.
 External producers use `@tracepack/evidence-sdk`, the public JSON Schema and the producer guide.
 
@@ -53,5 +53,7 @@ workflow uses Node 24 and updates npm before publishing.
    the downloaded archives using [`VERIFYING_RELEASES.md`](VERIFYING_RELEASES.md).
 7. Install the CLI and SDK in a clean project and run their documented examples.
 
-Sigstore is used only for software release provenance. Evidence files, evidence hashes, pack
-hashes and user information must never be submitted to its public transparency log.
+This publishing workflow uses Sigstore for software release provenance. The separate TracePack
+attestation APIs can also use Sigstore for signed pack statements. Evidence files are not part
+of this software publishing workflow. Pack attestation statements can contain a pack subject
+digest, and Sigstore transparency-log upload is enabled by default for attestation signing.
