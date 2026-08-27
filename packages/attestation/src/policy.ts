@@ -3,7 +3,7 @@ import type {
   AttestationVerificationResultV1,
   MultiPartyAttestationPolicyV1,
   Sha256Digest,
-} from "./types";
+} from "./types.js";
 
 function sameDigest(
   left: Sha256Digest,

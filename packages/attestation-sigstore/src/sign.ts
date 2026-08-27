@@ -7,7 +7,7 @@ import type {
 import type {
   SigstoreSigningOptions,
   SigstoreSigningResult,
-} from "./types";
+} from "./types.js";
 
 function asJsonObject(
   value: unknown,

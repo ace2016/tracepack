@@ -1,7 +1,7 @@
 {
-  "name": "@tracepack/attestation-sigstore",
+  "name": "@tracepack/pack-attestation",
   "version": "0.2.1",
-  "description": "Sigstore signing and verification runtime for TracePack attestations.",
+  "description": "Integration layer binding immutable TracePack pack snapshots to portable attestation subjects.",
   "license": "Apache-2.0",
   "type": "module",
   "exports": {
@@ -18,24 +18,21 @@
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
-    "@sigstore/bundle": "^5.0.0",
     "@tracepack/attestation": "workspace:*",
-    "sigstore": "^5.0.0"
+    "@tracepack/evidence-core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
-    "esbuild": "^0.28.1",
-    "tsx": "^4.23.12",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.4",
+    "esbuild": "^0.28.1"
   },
   "engines": {
-    "node": "^22.22.2 || ^24.15.0 || >=26"
+    "node": ">=18"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ace2016/tracepack.git",
-    "directory": "packages/attestation-sigstore"
+    "directory": "packages/pack-attestation"
   },
   "homepage": "https://dev.tracepack.org/",
   "bugs": {

@@ -24,7 +24,7 @@ import type {
 import type {
   SigstoreIdentityPolicy,
   SigstoreRuntimeVerificationResult,
-} from "./types";
+} from "./types.js";
 
 function failureMessage(
   error: unknown,

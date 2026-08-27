@@ -11,11 +11,11 @@ import type {
 import {
   SigstoreVerificationError,
   verifyWithSigstore,
-} from "./verify";
+} from "./verify.js";
 
 import type {
   SigstoreIdentityPolicy,
-} from "./types";
+} from "./types.js";
 
 export async function verifyAttestationWithSigstore(
   input: unknown,

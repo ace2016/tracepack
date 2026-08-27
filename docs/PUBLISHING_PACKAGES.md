@@ -1,12 +1,15 @@
 # Publishing Tracepack developer packages
 
-Tracepack publishes five public packages:
+Tracepack publishes eight public developer packages:
 
 1. `@tracepack/evidence-core`
 2. `@tracepack/template-engine`
 3. `@tracepack/evidence-sdk`
 4. `@tracepack/integration`
 5. `@tracepack/cli`
+6. `@tracepack/attestation`
+7. `@tracepack/attestation-sigstore`
+8. `@tracepack/pack-attestation`
 
 `@tracepack/evidence-interchange` is deliberately not a fifth public package. It is the
 Tracepack workspace's internal importer and depends on browser storage and document processing.
@@ -38,12 +41,12 @@ workflow uses Node 24 and updates npm before publishing.
 ## Release routine
 
 1. Update package versions intentionally.
-   The `developer-v<version>` tag must match all five package versions or the workflow stops
+   The `developer-v<version>` tag must match all eight package versions or the workflow stops
    before signing or publishing. Release tags currently accept only the stable
    `developer-vX.Y.Z` form. Prerelease tags are rejected rather than published under npm's
    default `latest` channel.
 2. Run `pnpm run build:sdk`, `pnpm -r typecheck` and `pnpm -r test`.
-3. Run `pnpm run release:check` and review all five generated archives.
+3. Run `pnpm run release:check` and review all eight generated archives.
 4. Merge the reviewed change into the public repository.
 5. Run the publishing workflow and approve the `npm-production` environment.
 6. Check the npm provenance badge, run `npm audit signatures` in a clean test project and verify

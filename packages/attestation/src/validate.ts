@@ -4,7 +4,7 @@ import type {
   JsonValue,
   MultiPartyAttestationPolicyV1,
   SignedAttestationV1,
-} from "./types";
+} from "./types.js";
 
 const jsonValueSchema: z.ZodType<JsonValue> =
   z.lazy(() =>

@@ -10,6 +10,9 @@ const packages = [
   "evidence-sdk",
   "integration",
   "cli",
+  "attestation",
+  "attestation-sigstore",
+  "pack-attestation",
 ];
 const releaseTag = process.env.TRACEPACK_RELEASE_TAG;
 const releaseTagMatch = releaseTag?.match(
@@ -60,10 +63,25 @@ try {
     if (!manifest.homepage || !manifest.bugs?.url) fail(`${manifest.name} is missing public support links`);
   }
 
-  const interchange = JSON.parse(
-    readFileSync(join(root, "packages", "evidence-interchange", "package.json"), "utf8"),
-  );
-  if (interchange.private !== true) fail("evidence-interchange must remain internal");
+  const internalPackages = [
+    "document-engine",
+    "evidence-interchange",
+    "export-engine",
+    "storage",
+  ];
+
+  for (const folder of internalPackages) {
+    const manifest = JSON.parse(
+      readFileSync(
+        join(root, "packages", folder, "package.json"),
+        "utf8",
+      ),
+    );
+
+    if (manifest.private !== true) {
+      fail(`${manifest.name} must remain internal`);
+    }
+  }
 
   pnpm(["run", "build:sdk"]);
   pnpm(["-r", "typecheck"]);
@@ -77,6 +95,89 @@ try {
   const archives = readdirSync(releaseDir).filter((name) => name.endsWith(".tgz"));
   if (archives.length !== packages.length) {
     fail(`expected ${packages.length} archives, found ${archives.length}`);
+  }
+
+  const requiredArchiveEntries = {
+    attestation: [
+      "package/package.json",
+      "package/LICENSE",
+      "package/README.md",
+      "package/SPEC.md",
+      "package/schema/tracepack-attestation.v1.json",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ],
+    "attestation-sigstore": [
+      "package/package.json",
+      "package/LICENSE",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ],
+    "pack-attestation": [
+      "package/package.json",
+      "package/LICENSE",
+      "package/dist/index.js",
+      "package/dist/index.d.ts",
+    ],
+  };
+
+  for (const [folder, requiredEntries] of Object.entries(requiredArchiveEntries)) {
+    const expectedArchiveName =
+      `tracepack-${folder}-${expectedVersion}.tgz`;
+
+    const archiveName = archives.find(
+      (name) =>
+        name === expectedArchiveName,
+    );
+
+    if (!archiveName) {
+      fail(`missing archive for @tracepack/${folder}`);
+    }
+
+    const archivePath = join(
+      releaseDir,
+      archiveName,
+    );
+
+    const contents = execFileSync(
+      "tar",
+      ["-tzf", archivePath],
+      {
+        encoding: "utf8",
+      },
+    )
+      .split("\n")
+      .filter(Boolean);
+
+    const contentSet =
+      new Set(contents);
+
+    for (const entry of requiredEntries) {
+      if (!contentSet.has(entry)) {
+        fail(
+          `@tracepack/${folder} archive is missing ${entry}`,
+        );
+      }
+    }
+
+    const forbiddenPrefixes = [
+      "package/src/",
+      "package/tests/",
+      "package/scripts/",
+    ];
+
+    for (const entry of contents) {
+      if (
+        forbiddenPrefixes.some(
+          (prefix) =>
+            entry.startsWith(prefix),
+        )
+      ) {
+        fail(
+          `@tracepack/${folder} archive contains development file ${entry}`,
+        );
+      }
+    }
   }
 
   run(process.execPath, [join(root, "packages", "cli", "dist", "cli.js"), "--help"]);

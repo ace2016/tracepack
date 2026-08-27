@@ -2,7 +2,7 @@
 
 Portable TracePack attestation primitives.
 
-This package is under active v1 development and is intentionally not published to npm until the contract and Sigstore implementation are frozen.
+This package provides the portable TracePack Attestation v1 contract and verification primitives used by TracePack developer tooling.
 
 It provides:
 
