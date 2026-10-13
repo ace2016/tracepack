@@ -19,7 +19,7 @@
     "test": "vitest run --passWithNoTests",
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
-  "dependencies": { "@tracepack/evidence-core": "workspace:*", "yaml": "^2.8.1", "zod": "^4.1.5" },
+  "dependencies": { "@tracepack/evidence-core": "workspace:*", "yaml": "^2.9.1", "zod": "^4.6.5" },
   "devDependencies": { "esbuild": "^0.28.1", "typescript": "^5.9.2", "vitest": "^3.2.4" },
   "engines": { "node": ">=18" }
 }
