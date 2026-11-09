@@ -18,9 +18,9 @@
     "prepublishOnly": "pnpm run build && pnpm run test"
   },
   "dependencies": {
-    "@sigstore/bundle": "^5.0.0",
+    "@sigstore/bundle": "^5.0.1",
     "@tracepack/attestation": "workspace:*",
-    "sigstore": "^5.0.0"
+    "sigstore": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
